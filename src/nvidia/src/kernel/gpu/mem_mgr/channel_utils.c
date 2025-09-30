@@ -608,6 +608,7 @@ channelFillPbFastScrub
     NvU32   semaValue      = 0;
     NvU32   data           = 0;
     NvU64   pSemaAddr      = 0;
+    NvU32   intrValue      = 0;
 
     NV_PRINTF(LEVEL_INFO, "PutIndex: %x, PbOffset: %x\n", putIndex,
                putIndex * pChannel->methodSizePerBlock);
@@ -625,8 +626,20 @@ channelFillPbFastScrub
                   DRF_DEF(C8B5, _SET_REMAP_COMPONENTS, _COMPONENT_SIZE, _ONE)     |
                   DRF_DEF(C8B5, _SET_REMAP_COMPONENTS, _NUM_DST_COMPONENTS, _ONE));
 
-    NV_PUSH_INC_1U(RM_SUBCHANNEL, NVC8B5_SET_DST_PHYS_MODE,
-                  DRF_DEF(C8B5, _SET_DST_PHYS_MODE, _TARGET, _LOCAL_FB));
+    if (pChannelPbInfo->dstAddressSpace == ADDR_FBMEM)
+    {
+        data = DRF_DEF(B0B5, _SET_DST_PHYS_MODE, _TARGET, _LOCAL_FB);
+    }
+    else if (pChannelPbInfo->dstCpuCacheAttrib == NV_MEMORY_CACHED)
+    {
+        data = DRF_DEF(B0B5, _SET_DST_PHYS_MODE, _TARGET, _COHERENT_SYSMEM);
+    }
+    else
+    {
+        data = DRF_DEF(B0B5, _SET_DST_PHYS_MODE, _TARGET, _NONCOHERENT_SYSMEM);
+    }
+
+    NV_PUSH_INC_1U(RM_SUBCHANNEL, NVC8B5_SET_DST_PHYS_MODE, data);
 
     semaValue = (bInsertFinishPayload) ?
         DRF_DEF(C8B5, _LAUNCH_DMA, _SEMAPHORE_TYPE, _RELEASE_ONE_WORD_SEMAPHORE) : 0;
@@ -640,6 +653,11 @@ channelFillPbFastScrub
         flushValue = DRF_DEF(B0B5, _LAUNCH_DMA, _FLUSH_ENABLE, _TRUE);
     else
         flushValue = DRF_DEF(B0B5, _LAUNCH_DMA, _FLUSH_ENABLE, _FALSE);
+
+    if (pChannelPbInfo->pCompletionCallback != NULL)
+    {
+        intrValue = DRF_DEF(B0B5, _LAUNCH_DMA, _INTERRUPT_TYPE, _NON_BLOCKING);
+    }
 
     NV_PUSH_INC_2U(RM_SUBCHANNEL,
         NVC8B5_OFFSET_OUT_UPPER, NvU64_HI32(pChannelPbInfo->dstAddr),
@@ -669,6 +687,7 @@ channelFillPbFastScrub
             DRF_DEF(C8B5, _LAUNCH_DMA, _SRC_TYPE, _PHYSICAL)          |
             pipelinedValue                                            |
             flushValue                                                |
+            intrValue                                                 |
             semaValue);
 
     //

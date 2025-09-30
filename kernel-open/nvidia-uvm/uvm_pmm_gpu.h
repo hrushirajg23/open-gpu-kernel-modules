@@ -190,8 +190,7 @@ typedef uvm_chunk_size_t uvm_chunk_sizes_mask_t;
 
 typedef struct uvm_pmm_gpu_chunk_suballoc_struct uvm_pmm_gpu_chunk_suballoc_t;
 
-#if UVM_IS_CONFIG_HMM()
-
+#if UVM_IS_CONFIG_HMM() || defined(NV_MEMORY_DEVICE_COHERENT_PRESENT)
 typedef struct
 {
     // For g_uvm_global.devmem_ranges
@@ -205,7 +204,9 @@ typedef struct
 
     struct dev_pagemap pagemap;
 } uvm_pmm_gpu_devmem_t;
+#endif
 
+#if UVM_IS_CONFIG_HMM()
 typedef struct uvm_pmm_gpu_struct uvm_pmm_gpu_t;
 
 // Return the GPU chunk for a given device private struct page.
@@ -219,18 +220,17 @@ uvm_gpu_id_t uvm_pmm_devmem_page_to_gpu_id(struct page *page);
 
 // Return the PFN of the device private struct page for the given GPU chunk.
 unsigned long uvm_pmm_gpu_devmem_get_pfn(uvm_pmm_gpu_t *pmm, uvm_gpu_chunk_t *chunk);
+#endif
+
+// Allocate and initialise struct page data in the kernel to support HMM.
+NV_STATUS uvm_pmm_devmem_init(uvm_parent_gpu_t *gpu);
+void uvm_pmm_devmem_deinit(uvm_parent_gpu_t *parent_gpu);
+
+void uvm_pmm_gpu_device_p2p_init(uvm_parent_gpu_t *gpu);
+void uvm_pmm_gpu_device_p2p_deinit(uvm_parent_gpu_t *gpu);
 
 // Free unused ZONE_DEVICE pages.
 void uvm_pmm_devmem_exit(void);
-
-#else
-static inline void uvm_pmm_devmem_exit(void)
-{
-}
-#endif
-
-void uvm_pmm_gpu_device_p2p_init(uvm_gpu_t *gpu);
-void uvm_pmm_gpu_device_p2p_deinit(uvm_gpu_t *gpu);
 
 struct uvm_gpu_chunk_struct
 {
@@ -626,10 +626,6 @@ static uvm_chunk_size_t uvm_chunk_find_prev_size(uvm_chunk_sizes_mask_t chunk_si
 // checking that the chunks are still there. Also, the VA block(s) are
 // retained, and it's up to the caller to release them.
 NvU32 uvm_pmm_gpu_phys_to_virt(uvm_pmm_gpu_t *pmm, NvU64 phys_addr, NvU64 region_size, uvm_reverse_map_t *out_mappings);
-
-// Allocate and initialise struct page data in the kernel to support HMM.
-NV_STATUS uvm_pmm_devmem_init(uvm_parent_gpu_t *gpu);
-void uvm_pmm_devmem_deinit(uvm_parent_gpu_t *parent_gpu);
 
 // Iterates over every size in the input mask from smallest to largest
 #define for_each_chunk_size(__size, __chunk_sizes)                                  \

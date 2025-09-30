@@ -1020,7 +1020,7 @@ NV_STATUS uvm_api_migrate(UVM_MIGRATE_PARAMS *params, struct file *filp)
                 .fail_on_unresolved_sto_errors      = false,
             };
 
-            if (dest_gpu && dest_gpu->mem_info.cdmm_enabled) {
+            if (dest_gpu && dest_gpu->parent->cdmm_enabled) {
                 uvm_migrate_args.dst_id = UVM_ID_CPU;
                 uvm_migrate_args.dst_node_id = dest_gpu->parent->closest_cpu_numa_node;
                 uvm_migrate_args.populate_on_cpu_alloc_failures = true;

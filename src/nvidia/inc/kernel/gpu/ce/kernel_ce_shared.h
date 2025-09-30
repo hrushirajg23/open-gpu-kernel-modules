@@ -26,6 +26,8 @@
 
 #include "gpu/gpu.h"
 
+#define UNKNOWN_PCIE_GEN_SPEED 0xFFFFFFFF
+
 /**
  * Routines shared between CE and KCE.
  */
@@ -35,5 +37,8 @@ NvBool ceIsPartneredWithGr(OBJGPU *pGpu, RM_ENGINE_TYPE ceEngineType, RM_ENGINE_
 NvU32  ceCountGrCe(OBJGPU *pGpu);
 void cePauseCeUtilsScheduling(OBJGPU *pGpu);
 void ceResumeCeUtilsScheduling(OBJGPU *pGpu);
+
+NvU32 ceEncodeLceTypeMetadataForPcie(OBJGPU *pGpu, NvU32 pcieGenSpeed);
+NvU32 ceDecodePcieGenSpeedFromLceTypeMetadata(OBJGPU *pGpu, NvU32 lceTypeMetadata);
 
 #endif

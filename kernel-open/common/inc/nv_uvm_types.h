@@ -685,6 +685,9 @@ typedef struct UvmGpuInfo_tag
 
     // GPU supports Non-PASID ATS capability
     NvBool nonPasidAtsSupport;
+
+    // GPU setup in CDMM mode
+    NvBool cdmmEnabled;
 } UvmGpuInfo;
 
 typedef struct UvmGpuFbInfo_tag

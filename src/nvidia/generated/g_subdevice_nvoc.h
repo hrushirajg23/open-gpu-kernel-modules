@@ -1606,6 +1606,26 @@ static inline NV_STATUS subdeviceCtrlCmdNvlinkGetFirmwareVersionInfo(struct Subd
 #define subdeviceCtrlCmdNvlinkGetFirmwareVersionInfo(arg_this, arg2) subdeviceCtrlCmdNvlinkGetFirmwareVersionInfo_IMPL(arg_this, arg2)
 #endif // __nvoc_subdevice_h_disabled
 
+NV_STATUS subdeviceCtrlCmdNvlinkSaveNodeHostname_IMPL_IMPL(struct Subdevice *arg_this, NV2080_CTRL_NVLINK_SAVE_NODE_HOSTNAME_PARAMS *pParams);
+#ifdef __nvoc_subdevice_h_disabled
+static inline NV_STATUS subdeviceCtrlCmdNvlinkSaveNodeHostname_IMPL(struct Subdevice *arg_this, NV2080_CTRL_NVLINK_SAVE_NODE_HOSTNAME_PARAMS *pParams) {
+    NV_ASSERT_FAILED_PRECOMP("Subdevice was disabled!");
+    return NV_ERR_NOT_SUPPORTED;
+}
+#else // __nvoc_subdevice_h_disabled
+#define subdeviceCtrlCmdNvlinkSaveNodeHostname_IMPL(arg_this, pParams) subdeviceCtrlCmdNvlinkSaveNodeHostname_IMPL_IMPL(arg_this, pParams)
+#endif // __nvoc_subdevice_h_disabled
+
+NV_STATUS subdeviceCtrlCmdNvlinkGetSavedNodeHostname_IMPL_IMPL(struct Subdevice *arg_this, NV2080_CTRL_NVLINK_GET_SAVED_NODE_HOSTNAME_PARAMS *pParams);
+#ifdef __nvoc_subdevice_h_disabled
+static inline NV_STATUS subdeviceCtrlCmdNvlinkGetSavedNodeHostname_IMPL(struct Subdevice *arg_this, NV2080_CTRL_NVLINK_GET_SAVED_NODE_HOSTNAME_PARAMS *pParams) {
+    NV_ASSERT_FAILED_PRECOMP("Subdevice was disabled!");
+    return NV_ERR_NOT_SUPPORTED;
+}
+#else // __nvoc_subdevice_h_disabled
+#define subdeviceCtrlCmdNvlinkGetSavedNodeHostname_IMPL(arg_this, pParams) subdeviceCtrlCmdNvlinkGetSavedNodeHostname_IMPL_IMPL(arg_this, pParams)
+#endif // __nvoc_subdevice_h_disabled
+
 NV_STATUS subdeviceCtrlCmdI2cReadBuffer_IMPL(struct Subdevice *pSubdevice, NV2080_CTRL_I2C_READ_BUFFER_PARAMS *pI2cParams);
 #ifdef __nvoc_subdevice_h_disabled
 static inline NV_STATUS subdeviceCtrlCmdI2cReadBuffer(struct Subdevice *pSubdevice, NV2080_CTRL_I2C_READ_BUFFER_PARAMS *pI2cParams) {
@@ -7148,6 +7168,10 @@ NV_STATUS subdeviceCtrlCmdNvlinkGetPlatformInfo_IMPL(struct Subdevice *arg1, NV2
 NV_STATUS subdeviceCtrlCmdNvlinkGetNvleEncryptEnInfo_IMPL(struct Subdevice *arg1, NV2080_CTRL_NVLINK_GET_NVLE_ENCRYPT_EN_INFO_PARAMS *arg2);
 
 NV_STATUS subdeviceCtrlCmdNvlinkGetFirmwareVersionInfo_IMPL(struct Subdevice *arg1, NV2080_CTRL_NVLINK_GET_FIRMWARE_VERSION_INFO_PARAMS *arg2);
+
+NV_STATUS subdeviceCtrlCmdNvlinkSaveNodeHostname_IMPL_IMPL(struct Subdevice *arg1, NV2080_CTRL_NVLINK_SAVE_NODE_HOSTNAME_PARAMS *pParams);
+
+NV_STATUS subdeviceCtrlCmdNvlinkGetSavedNodeHostname_IMPL_IMPL(struct Subdevice *arg1, NV2080_CTRL_NVLINK_GET_SAVED_NODE_HOSTNAME_PARAMS *pParams);
 
 NV_STATUS subdeviceCtrlCmdI2cReadBuffer_IMPL(struct Subdevice *pSubdevice, NV2080_CTRL_I2C_READ_BUFFER_PARAMS *pI2cParams);
 

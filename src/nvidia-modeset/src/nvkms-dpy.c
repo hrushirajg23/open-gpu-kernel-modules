@@ -24,6 +24,7 @@
 #include "dp/nvdp-device.h"
 #include "dp/nvdp-connector-event-sink.h"
 
+#include "nvkms-api-types.h"
 #include "nvkms-evo.h"
 #include "nvkms-dpy.h"
 #include "nvkms-dpy-override.h"
@@ -44,6 +45,7 @@
 #include "timing/dpsdp.h"
 
 #include "displayport/displayport.h"
+#include "timing/nvtiming.h"
 
 #include <ctrl/ctrl0073/ctrl0073dfp.h> // NV0073_CTRL_DFP_FLAGS_*
 #include <ctrl/ctrl0073/ctrl0073dp.h> // NV0073_CTRL_CMD_DP_GET_LINK_CONFIG_*
@@ -100,23 +102,6 @@ static void DpyDisconnectEvo(NVDpyEvoPtr pDpyEvo, const NvBool bSendHdmiCapsToRm
     ClearEdid(pDpyEvo, bSendHdmiCapsToRm);
 }
 
-static void HdmiFrlSetConfig(NVDpyEvoRec *pDpyEvo)
-{
-    NVDispEvoRec *pDispEvo = pDpyEvo->pDispEvo;
-    NvU32 head;
-
-    if ((pDpyEvo->apiHead == NV_INVALID_HEAD) || !nvDpyIsHdmiEvo(pDpyEvo) ||
-            !nvHdmiDpySupportsFrl(pDpyEvo)) {
-        return;
-    }
-
-    head = nvGetPrimaryHwHead(pDispEvo, pDpyEvo->apiHead);
-
-    nvAssert(head != NV_INVALID_HEAD);
-
-    nvHdmiFrlSetConfig(pDispEvo, head);
-}
-
 static NvBool DpyConnectEvo(
     NVDpyEvoPtr pDpyEvo,
     struct NvKmsQueryDpyDynamicDataParams *pParams)
@@ -139,8 +124,6 @@ static NvBool DpyConnectEvo(
     }
 
     nvUpdateInfoFrames(pDpyEvo);
-
-    HdmiFrlSetConfig(pDpyEvo);
 
     return TRUE;
 }
@@ -682,7 +665,20 @@ static void ReadAndApplyEdidEvo(
                      &infoString);
     } else {
         nvFree(edid.buffer);
+
+        if (nvDpyIsHdmiEvo(pDpyEvo) &&
+            nvHdmiDpySupportsFrl(pDpyEvo) &&
+            pDpyEvo->hdmi.reassessFrlLinkCaps) {
+            /*
+             * Although there’s no change in EDID, if there was a HPD or
+             * re-training request, reassess the FRL Link.
+             */
+            nvHdmiFrlAssessLink(pDpyEvo);
+        }
     }
+
+    pDpyEvo->hdmi.reassessFrlLinkCaps = FALSE;
+
     nvFree(pParsedEdid);
 }
 
@@ -2593,6 +2589,8 @@ void nvConstructDpVscSdp(const NVDispHeadInfoFrameStateEvoRec *pInfoFrame,
                     sdp->db.colorimetryFormat =
                         SDP_VSC_COLOR_FMT_RGB_COLORIMETRY_ITU_R_BT2020_RGB;
                     break;
+                case NVKMS_OUTPUT_COLORIMETRY_BT601:
+                case NVKMS_OUTPUT_COLORIMETRY_BT709:
                 case NVKMS_OUTPUT_COLORIMETRY_DEFAULT:
                     sdp->db.colorimetryFormat =
                         SDP_VSC_COLOR_FMT_RGB_COLORIMETRY_SRGB;
@@ -2621,6 +2619,14 @@ void nvConstructDpVscSdp(const NVDispHeadInfoFrameStateEvoRec *pInfoFrame,
                 case NVKMS_OUTPUT_COLORIMETRY_BT2100:
                     sdp->db.colorimetryFormat =
                         SDP_VSC_COLOR_FMT_YCBCR_COLORIMETRY_ITU_R_BT2020_YCBCR;
+                    break;
+                case NVKMS_OUTPUT_COLORIMETRY_BT601:
+                    sdp->db.colorimetryFormat =
+                        SDP_VSC_COLOR_FMT_YCBCR_COLORIMETRY_ITU_R_BT601;
+                    break;
+                case NVKMS_OUTPUT_COLORIMETRY_BT709:
+                    sdp->db.colorimetryFormat =
+                        SDP_VSC_COLOR_FMT_YCBCR_COLORIMETRY_ITU_R_BT709;
                     break;
                 case NVKMS_OUTPUT_COLORIMETRY_DEFAULT:
                     sdp->db.colorimetryFormat =
@@ -2674,6 +2680,7 @@ static void UpdateDpVscSdpInfoFrame(
                                 &pDispEvo->headState[head];
     NV0073_CTRL_SPECIFIC_SET_OD_PACKET_PARAMS params = { 0 };
     NVDevEvoPtr pDevEvo = pDispEvo->pDevEvo;
+    DPSDP_DP_VSC_SDP_DESCRIPTOR *sdp;
     NvU32 ret;
 
     /*
@@ -2687,31 +2694,23 @@ static void UpdateDpVscSdpInfoFrame(
     params.subDeviceInstance = pDispEvo->displayOwner;
     params.displayId = pHeadState->activeRmId;
 
-    if ((pDpyColor->format == NV_KMS_DPY_ATTRIBUTE_CURRENT_COLOR_SPACE_YCbCr420) ||
-        (pDpyColor->colorimetry == NVKMS_OUTPUT_COLORIMETRY_BT2100)) {
+    // DPSDP_DP_VSC_SDP_DESCRIPTOR has a (dataSize, hb, db) layout, while
+    // NV0073_CTRL_SPECIFIC_SET_OD_PACKET_PARAMS.aPacket needs to contain
+    // (hb, db) without dataSize, so this makes sdp->hb align with aPacket.
+    sdp = (DPSDP_DP_VSC_SDP_DESCRIPTOR *)(params.aPacket -
+        offsetof(DPSDP_DP_VSC_SDP_DESCRIPTOR, hb));
 
-        // DPSDP_DP_VSC_SDP_DESCRIPTOR has a (dataSize, hb, db) layout, while
-        // NV0073_CTRL_SPECIFIC_SET_OD_PACKET_PARAMS.aPacket needs to contain
-        // (hb, db) without dataSize, so this makes sdp->hb align with aPacket.
-        DPSDP_DP_VSC_SDP_DESCRIPTOR *sdp =
-            (DPSDP_DP_VSC_SDP_DESCRIPTOR *)(params.aPacket -
-            offsetof(DPSDP_DP_VSC_SDP_DESCRIPTOR, hb));
+    nvAssert((void *)&sdp->hb == (void *)params.aPacket);
 
-        nvAssert((void *)&sdp->hb == (void *)params.aPacket);
+    nvConstructDpVscSdp(pInfoFrame, pDpyColor, sdp);
 
-        nvConstructDpVscSdp(pInfoFrame, pDpyColor, sdp);
+    params.packetSize = sizeof(sdp->hb) + sdp->hb.numValidDataBytes;
 
-        params.packetSize = sizeof(sdp->hb) + sdp->hb.numValidDataBytes;
-
-        params.transmitControl =
-            DRF_DEF(0073_CTRL_SPECIFIC, _SET_OD_PACKET_TRANSMIT_CONTROL, _ENABLE, _YES) |
-            DRF_DEF(0073_CTRL_SPECIFIC, _SET_OD_PACKET_TRANSMIT_CONTROL, _OTHER_FRAME, _DISABLE) |
-            DRF_DEF(0073_CTRL_SPECIFIC, _SET_OD_PACKET_TRANSMIT_CONTROL, _SINGLE_FRAME, _DISABLE) |
-            DRF_DEF(0073_CTRL_SPECIFIC, _SET_OD_PACKET_TRANSMIT_CONTROL, _ON_HBLANK, _DISABLE);
-    } else {
-        params.transmitControl =
-            DRF_DEF(0073_CTRL_SPECIFIC, _SET_OD_PACKET_TRANSMIT_CONTROL, _ENABLE, _NO);
-    }
+    params.transmitControl =
+        DRF_DEF(0073_CTRL_SPECIFIC, _SET_OD_PACKET_TRANSMIT_CONTROL, _ENABLE, _YES) |
+        DRF_DEF(0073_CTRL_SPECIFIC, _SET_OD_PACKET_TRANSMIT_CONTROL, _OTHER_FRAME, _DISABLE) |
+        DRF_DEF(0073_CTRL_SPECIFIC, _SET_OD_PACKET_TRANSMIT_CONTROL, _SINGLE_FRAME, _DISABLE) |
+        DRF_DEF(0073_CTRL_SPECIFIC, _SET_OD_PACKET_TRANSMIT_CONTROL, _ON_HBLANK, _DISABLE);
 
     ret = nvRmApiControl(nvEvoGlobal.clientHandle,
                          pDevEvo->displayCommonHandle,
@@ -3360,10 +3359,10 @@ NvKmsDpyOutputColorFormatInfo nvDpyGetOutputColorFormatInfo(
                     NV_KMS_DPY_ATTRIBUTE_CURRENT_COLOR_BPC_8;
             }
         } else if (nvConnectorUsesDPLib(pDpyEvo->pConnectorEvo)) {
+            const NVT_EDID_INFO *info = &pDpyEvo->parsedEdid.info;
 
             if (pDpyEvo->parsedEdid.valid &&
-                pDpyEvo->parsedEdid.info.input.isDigital &&
-                pDpyEvo->parsedEdid.info.version >= NVT_EDID_VER_1_4) {
+                info->input.isDigital && info->version >= NVT_EDID_VER_1_4) {
                 if (pDpyEvo->parsedEdid.info.input.u.digital.bpc >= 10) {
                     colorFormatsInfo.rgb444.maxBpc =
                         NV_KMS_DPY_ATTRIBUTE_CURRENT_COLOR_BPC_10;
@@ -3406,6 +3405,39 @@ NvKmsDpyOutputColorFormatInfo nvDpyGetOutputColorFormatInfo(
                     NV_KMS_DPY_ATTRIBUTE_CURRENT_COLOR_BPC_8;
                 colorFormatsInfo.rgb444.minBpc =
                     NV_KMS_DPY_ATTRIBUTE_CURRENT_COLOR_BPC_8;
+            }
+
+            if (pDpyEvo->parsedEdid.valid && info->input.isDigital &&
+                (info->input.u.digital.video_interface ==
+                 NVT_EDID_DIGITAL_VIDEO_INTERFACE_STANDARD_HDMI_A_SUPPORTED ||
+                 info->input.u.digital.video_interface ==
+                 NVT_EDID_DIGITAL_VIDEO_INTERFACE_STANDARD_HDMI_B_SUPPORTED)) {
+
+                /*
+                 * Prevent RGB 444 @ 6 BPC on active DP-to-HDMI adapters since
+                 * HDMI does not support RGB 444 @ 6 BPC.
+                 */
+                if (colorFormatsInfo.rgb444.minBpc ==
+                    NV_KMS_DPY_ATTRIBUTE_CURRENT_COLOR_BPC_6) {
+                    colorFormatsInfo.rgb444.minBpc =
+                        NV_KMS_DPY_ATTRIBUTE_CURRENT_COLOR_BPC_8;
+                }
+
+                // Prevent >=10 BPC on active DP-to-HDMI adapters, if the dc_30_bit is not set
+                if ((info->version < NVT_EDID_VER_1_4 ||
+                     !info->hdmiLlcInfo.dc_30_bit) &&
+                    colorFormatsInfo.rgb444.maxBpc !=
+                    NV_KMS_DPY_ATTRIBUTE_CURRENT_COLOR_BPC_UNKNOWN) {
+                    colorFormatsInfo.rgb444.maxBpc =
+                        NV_KMS_DPY_ATTRIBUTE_CURRENT_COLOR_BPC_8;
+                }
+                if ((info->version < NVT_EDID_VER_1_4 ||
+                     !info->hdmiLlcInfo.dc_30_bit) &&
+                    colorFormatsInfo.yuv444.maxBpc !=
+                    NV_KMS_DPY_ATTRIBUTE_CURRENT_COLOR_BPC_UNKNOWN) {
+                    colorFormatsInfo.yuv444.maxBpc =
+                        NV_KMS_DPY_ATTRIBUTE_CURRENT_COLOR_BPC_8;
+                }
             }
         } else {
             colorFormatsInfo.rgb444.maxBpc =

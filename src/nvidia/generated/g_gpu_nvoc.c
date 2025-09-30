@@ -346,6 +346,9 @@ void __nvoc_init_dataField_OBJGPU(OBJGPU *pThis) {
         pThis->setProperty(pThis, PDB_PROP_GPU_TOGGLE_DYNAMIC_THROTTLE_WINDOW_SIZE_SUPPORTED, NV_FALSE);
     }
 
+    // NVOC Property Hal field -- PDB_PROP_GPU_UNIX_HDMI_FRL_COMPLIANCE_ENABLED
+    pThis->setProperty(pThis, PDB_PROP_GPU_UNIX_HDMI_FRL_COMPLIANCE_ENABLED, NV_TRUE);
+
     // Hal field -- bIsFlexibleFlaSupported
     if (( ((chipHal_HalVarIdx >> 5) == 1UL) && ((1UL << (chipHal_HalVarIdx & 0x1f)) & 0xf0000000UL) ) ||
         ( ((chipHal_HalVarIdx >> 5) == 2UL) && ((1UL << (chipHal_HalVarIdx & 0x1f)) & 0x00000fe6UL) )) /* ChipHal: GH100 | GB100 | GB102 | GB10B | GB110 | GB112 | GB202 | GB203 | GB205 | GB206 | GB207 | GB20B | GB20C */ 
@@ -382,17 +385,17 @@ void __nvoc_init_dataField_OBJGPU(OBJGPU *pThis) {
         pThis->setProperty(pThis, PDB_PROP_GPU_VGPU_OFFLOAD_CAPABLE, NV_FALSE);
     }
 
-    // NVOC Property Hal field -- PDB_PROP_GPU_POWER_MANAGEMENT_SUPPORTED
+    // NVOC Property Hal field -- PDB_PROP_GPU_POWER_MANAGEMENT_UNSUPPORTED
     if (( ((rmVariantHal_HalVarIdx >> 5) == 0UL) && ((1UL << (rmVariantHal_HalVarIdx & 0x1f)) & 0x00000003UL) )) /* RmVariantHal: VF | PF_KERNEL_ONLY */ 
     {
         if (( ((chipHal_HalVarIdx >> 5) == 2UL) && ((1UL << (chipHal_HalVarIdx & 0x1f)) & 0x00000c00UL) )) /* ChipHal: GB20B | GB20C */ 
         {
-            pThis->setProperty(pThis, PDB_PROP_GPU_POWER_MANAGEMENT_SUPPORTED, NV_FALSE);
+            pThis->setProperty(pThis, PDB_PROP_GPU_POWER_MANAGEMENT_UNSUPPORTED, NV_TRUE);
         }
         // default
         else
         {
-            pThis->setProperty(pThis, PDB_PROP_GPU_POWER_MANAGEMENT_SUPPORTED, NV_TRUE);
+            pThis->setProperty(pThis, PDB_PROP_GPU_POWER_MANAGEMENT_UNSUPPORTED, NV_FALSE);
         }
     }
 

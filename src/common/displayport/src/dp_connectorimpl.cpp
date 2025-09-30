@@ -196,7 +196,9 @@ void ConnectorImpl::applyRegkeyOverrides(const DP_REGKEY_DATABASE& dpRegkeyDatab
     this->bSkipZeroOuiCache                 = dpRegkeyDatabase.bSkipZeroOuiCache;
     this->bForceHeadShutdownFromRegkey      = dpRegkeyDatabase.bForceHeadShutdown;
     this->bEnableDevId                      = dpRegkeyDatabase.bEnableDevId;
+    this->bIgnoreCapsAndForceHighestLc     = dpRegkeyDatabase.bIgnoreCapsAndForceHighestLc;
     this->bDisableEffBppSST8b10b            = dpRegkeyDatabase.bDisableEffBppSST8b10b;
+    this->bHDMIOnDPPlusPlus                 = dpRegkeyDatabase.bHDMIOnDPPlusPlus;
 }
 
 void ConnectorImpl::setPolicyModesetOrderMitigation(bool enabled)
@@ -410,7 +412,16 @@ void ConnectorImpl::processNewDevice(const DiscoveryManager::Device & device,
     {
         case DISPLAY_PORT:
         case DISPLAY_PORT_PLUSPLUS: // DP port that supports DP and TMDS
-            connector = connectorDisplayPort;
+            if (bHDMIOnDPPlusPlus &&
+                existingDev &&
+                existingDev->connectorType == connectorHDMI)
+            {
+                connector = connectorHDMI;
+            }
+            else
+            {
+                connector = connectorDisplayPort;
+            }
             break;
 
         case ANALOG_VGA:
@@ -2531,11 +2542,11 @@ void ConnectorImpl::fireEventsInternal()
             if (dev->complianceDeviceEdidReadTest)
             {
                 // the zombie event will be hidden for DD/OS
-                DP_PRINTF(DP_WARNING, "DPCONN> Compliance: Device Internal Zombie? :  %d 0x%x", dev->shadow.zombie ? 1 : 0, dev);
+                DP_PRINTF(DP_WARNING, "DPCONN> Compliance: Device Internal Zombie? :  %d %p", dev->shadow.zombie ? 1 : 0, dev);
                 return;
             }
             bMitigateZombie = false;
-            DP_PRINTF(DP_WARNING, "DPCONN> Zombie? :  %d 0x%x", dev->shadow.zombie ? 1 : 0, dev);
+            DP_PRINTF(DP_WARNING, "DPCONN> Zombie? :  %d %p", dev->shadow.zombie ? 1 : 0, dev);
             sink->notifyZombieStateChange(dev, dev->shadow.zombie);
         }
 
@@ -2600,7 +2611,7 @@ void ConnectorImpl::fireEventsInternal()
                 {
                     // If yes, then we need to report this lost device first.
                     _device->shadow.plugged = false;
-                    DP_PRINTF(DP_WARNING, "DPCONN> Lost device 0x%x", _device);
+                    DP_PRINTF(DP_WARNING, "DPCONN> Lost device %p", _device);
                     sink->lostDevice(_device);
                     DP_ASSERT(!_device->activeGroup && "DD didn't remove panel from group");
                     delete _device;
@@ -3253,7 +3264,7 @@ bool ConnectorImpl::notifyAttachBegin(Group *                target,       // Gr
         }
     }
 
-    DP_PRINTF(DP_NOTICE, "DPCONN> Notify Attach Begin (Head %d, pclk %d raster %d x %d  %d bpp)",
+    DP_PRINTF(DP_NOTICE, "DPCONN> Notify Attach Begin (Head %d, pclk %" NvU64_fmtu " raster %d x %d  %d bpp)",
               modesetParams.headIndex, pixelClockHz, rasterWidth, rasterHeight, depth);
     NV_DPTRACE_INFO(NOTIFY_ATTACH_BEGIN, modesetParams.headIndex, pixelClockHz, rasterWidth, rasterHeight,
                        depth, bEnableDsc, bEnableFEC);
@@ -4202,7 +4213,7 @@ bool ConnectorImpl::allocateDpTunnelBw(NvU64 bandwidth)
         return false;
     }
 
-    DP_PRINTF(DP_INFO, "Estimated BW: %d Mbps, Requested BW: %d Mbps",
+    DP_PRINTF(DP_INFO, "Estimated BW: %" NvU64_fmtu " Mbps, Requested BW: %" NvU64_fmtu " Mbps",
               ((NvU64) estimatedBw * 1000) / (NvU64) granularityMultiplier,
               bandwidth / (1000 * 1000));
 
@@ -4242,7 +4253,7 @@ bool ConnectorImpl::allocateDpTunnelBw(NvU64 bandwidth)
             return false;
         }
 
-        DP_PRINTF(DP_INFO, "Failed to get requested BW, requesting updated Estimated BW: %d\n",
+        DP_PRINTF(DP_INFO, "Failed to get requested BW, requesting updated Estimated BW: %" NvU64_fmtu "\n",
                   ((NvU64) estimatedBw * 1000) / (NvU64) granularityMultiplier);
 
         requestBw = estimatedBw;
@@ -4262,7 +4273,7 @@ bool ConnectorImpl::allocateDpTunnelBw(NvU64 bandwidth)
         // Convert this back to bps and record the allocated BW
         this->allocatedDpTunnelBw       = ((NvU64) requestBw * 1000 * 1000 * 1000) / (NvU64) granularityMultiplier;
         this->allocatedDpTunnelBwShadow = 0;
-        DP_PRINTF(DP_INFO, "Allocated BW: %d Mbps", this->allocatedDpTunnelBw / (1000 * 1000));
+        DP_PRINTF(DP_INFO, "Allocated BW: %" NvU64_fmtu " Mbps", this->allocatedDpTunnelBw / (1000 * 1000));
     }
 
     return requestStatus;
@@ -4278,7 +4289,7 @@ bool ConnectorImpl::allocateMaxDpTunnelBw()
     NvU64 bandwidth = getMaxTunnelBw();
     if (!allocateDpTunnelBw(bandwidth))
     {
-        DP_PRINTF(DP_ERROR, "Failed to allocate DP Tunnel BW. Requested BW: %d Mbps",
+        DP_PRINTF(DP_ERROR, "Failed to allocate DP Tunnel BW. Requested BW: %" NvU64_fmtu " Mbps",
                   bandwidth / (1000 * 1000));
         return false;
     }
@@ -4553,7 +4564,7 @@ void ConnectorImpl::assessLink(LinkTrainingType trainType)
         else
         {
             DP_PRINTF(DP_WARNING,
-                      "DP> assessLink(): Failed to reach max link configuration (%d x %d).",
+                      "DP> assessLink(): Failed to reach max link configuration (%d x %" LinkRate_fmtu ").",
                       lConfig.lanes, lConfig.peakRate);
         }
     }
@@ -5627,13 +5638,13 @@ bool ConnectorImpl::validateLinkConfiguration(const LinkConfiguration & lConfig)
     {
         if (!IS_VALID_LINKBW_10M(linkRate10M))
         {
-            DP_PRINTF(DP_ERROR, "DPCONN> Requested link rate=%d is not valid", linkRate10M);
+            DP_PRINTF(DP_ERROR, "DPCONN> Requested link rate=%" NvU64_fmtu " is not valid", linkRate10M);
             return false;
         }
 
         if (linkRate10M > hal->getMaxLinkRate())
         {
-            DP_PRINTF(DP_ERROR, "DPCONN> Requested link rate=%d is larger than sinkMaxLinkRate=%d",
+            DP_PRINTF(DP_ERROR, "DPCONN> Requested link rate=%" NvU64_fmtu " is larger than sinkMaxLinkRate=%" NvU64_fmtu,
                       linkRate10M, hal->getMaxLinkRate());
             return false;
         }
@@ -5644,7 +5655,7 @@ bool ConnectorImpl::validateLinkConfiguration(const LinkConfiguration & lConfig)
             NvU32 i;
             if (!hal->isIndexedLinkrateEnabled())
             {
-                DP_PRINTF(DP_ERROR, "DPCONN> Indexed Link Rate=%d is Not Enabled in Sink", linkRate10M);
+                DP_PRINTF(DP_ERROR, "DPCONN> Indexed Link Rate=%" NvU64_fmtu " is Not Enabled in Sink", linkRate10M);
                 return false;
             }
 
@@ -5659,14 +5670,14 @@ bool ConnectorImpl::validateLinkConfiguration(const LinkConfiguration & lConfig)
                     break;
                 if (ilrTable[i] == 0)
                 {
-                    DP_PRINTF(DP_ERROR, "DPCONN> Indexed Link Rate=%d is Not Found", linkRate10M);
+                    DP_PRINTF(DP_ERROR, "DPCONN> Indexed Link Rate=%" NvU64_fmtu " is Not Found", linkRate10M);
                     return false;
                 }
             }
 
             if (i == NV0073_CTRL_DP_MAX_INDEXED_LINK_RATES)
             {
-                DP_PRINTF(DP_ERROR, "DPCONN> Indexed Link Rate=%d is Not Found", linkRate10M);
+                DP_PRINTF(DP_ERROR, "DPCONN> Indexed Link Rate=%" NvU64_fmtu " is Not Found", linkRate10M);
                 return false;
             }
         }
@@ -5686,6 +5697,12 @@ bool ConnectorImpl::train(const LinkConfiguration & lConfig, bool force,
     {
         return false;
     }
+
+if (this->bIgnoreCapsAndForceHighestLc)
+{
+        force = true;
+        hal->setPowerState(PowerStateD3);
+}
 
     //
     // Cancel pending HDCP authentication callbacks if have or may interrupt
@@ -6702,19 +6719,19 @@ bool ConnectorImpl::updateDpTunnelBwAllocation()
         connectorTunnelBw += devMaxModeBwRequired;
     }
 
-    DP_PRINTF(DP_INFO, "Required Connector Tunnel BW: %d Mbps", connectorTunnelBw / (1000 * 1000));
+    DP_PRINTF(DP_INFO, "Required Connector Tunnel BW: %" NvU64_fmtu " Mbps", connectorTunnelBw / (1000 * 1000));
 
     NvU64 maxTunnelBw = getMaxTunnelBw();
     if (connectorTunnelBw > maxTunnelBw)
     {
-        DP_PRINTF(DP_INFO, "Requested connector tunnel BW is larger than max Tunnel BW of %d Mbps. Overriding Max Tunnel BW\n",
+        DP_PRINTF(DP_INFO, "Requested connector tunnel BW is larger than max Tunnel BW of %" NvU64_fmtu " Mbps. Overriding Max Tunnel BW\n",
                   maxTunnelBw / (1000 * 1000));
         connectorTunnelBw = maxTunnelBw;
     }
 
     if (!allocateDpTunnelBw(connectorTunnelBw))
     {
-        DP_PRINTF(DP_ERROR, "Failed to allocate Dp Tunnel BW: %d Mbps", connectorTunnelBw / (1000 * 1000));
+        DP_PRINTF(DP_ERROR, "Failed to allocate Dp Tunnel BW: %" NvU64_fmtu " Mbps", connectorTunnelBw / (1000 * 1000));
         return false;
     }
     return true;
@@ -7537,7 +7554,7 @@ bool ConnectorImpl::setPreferredLinkConfig(LinkConfiguration & lc, bool commit,
 
     if (!validateLinkConfiguration(lc))
     {
-        DP_PRINTF(DP_ERROR, "Client requested bad LinkConfiguration. peakRate=%d, lanes=%d, bIs128b132ChannelCoding=%d",
+        DP_PRINTF(DP_ERROR, "Client requested bad LinkConfiguration. peakRate=%" LinkRate_fmtu ", lanes=%d, bIs128b132ChannelCoding=%d",
             lc.peakRate, lc.lanes, lc.bIs128b132bChannelCoding);
         return false;
     }
@@ -8166,7 +8183,7 @@ bool ConnectorImpl::handleTestLinkTrainRequest()
                     DP_ASSERT(0 && "Compliance: no group attached");
                 }
 
-                DP_PRINTF(DP_NOTICE, "DP> Compliance: LT on IRQ request: 0x%x, %d.", requestedRate, requestedLanes);
+                DP_PRINTF(DP_NOTICE, "DP> Compliance: LT on IRQ request: 0x%" LinkRate_fmtx ", %d.", requestedRate, requestedLanes);
                 // now see whether the current resolution is supported on the requested link config
                 LinkConfiguration lc(&linkPolicy, requestedLanes, requestedRate,
                                      hal->getEnhancedFraming(),
@@ -8180,7 +8197,7 @@ bool ConnectorImpl::handleTestLinkTrainRequest()
                 {
                     if (willLinkSupportModeSST(lc, groupAttached->lastModesetInfo))
                     {
-                        DP_PRINTF(DP_NOTICE, "DP> Compliance: Executing LT on IRQ: 0x%x, %d.", requestedRate, requestedLanes);
+                        DP_PRINTF(DP_NOTICE, "DP> Compliance: Executing LT on IRQ: 0x%" LinkRate_fmtx ", %d.", requestedRate, requestedLanes);
                         // we need to force the requirement irrespective of whether is supported or not.
                         if (!enableFlush())
                         {

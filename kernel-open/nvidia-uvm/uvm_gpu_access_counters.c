@@ -1576,7 +1576,7 @@ static NV_STATUS service_notifications_batch(uvm_gpu_va_space_t *gpu_va_space,
         }
     }
     else if (uvm_ats_can_service_faults(gpu_va_space, mm)) {
-        if (!gpu_va_space->gpu->mem_info.cdmm_enabled) {
+        if (!gpu_va_space->gpu->parent->cdmm_enabled) {
             status = service_notification_ats(gpu_va_space, mm, access_counters, index, out_index);
         }
         else {

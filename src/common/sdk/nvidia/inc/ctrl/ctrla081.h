@@ -113,6 +113,7 @@ typedef struct NVA081_CTRL_VGPU_INFO {
     NvU32 encoderCapacity;
     NV_DECLARE_ALIGNED(NvU64 bar1Length, 8);
     NvU32 frlEnable;
+    NvU16 vgpuSsvid;
     NvU8  adapterName[NV2080_GPU_MAX_NAME_STRING_LENGTH];
     NvU16 adapterName_Unicode[NV2080_GPU_MAX_NAME_STRING_LENGTH];
     NvU8  shortGpuNameString[NV2080_GPU_MAX_NAME_STRING_LENGTH];

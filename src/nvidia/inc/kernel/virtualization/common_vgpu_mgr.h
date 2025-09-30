@@ -148,4 +148,6 @@ vgpuMgrFreeSystemChannelIDs(OBJGPU *pGpu,
 
 NvU32 vgpuMgrGetSwrlCountToAllocate(OBJGPU *pGpu);
 
+NvU16 vgpuMgrGetVgpuSsvid(OBJGPU *pGpu);
+
 #endif // __common_vgpu_mgr_h__

@@ -940,7 +940,7 @@ NV_STATUS uvm_va_space_register_gpu(uvm_va_space_t *va_space,
         *numa_enabled = NV_TRUE;
         *numa_node_id = (NvS32)uvm_gpu_numa_node(gpu);
     }
-    else if (gpu->parent->is_integrated_gpu || gpu->mem_info.cdmm_enabled) {
+    else if (gpu->parent->is_integrated_gpu || gpu->parent->cdmm_enabled) {
         *numa_enabled = NV_FALSE;
         *numa_node_id = (NvS32)gpu->parent->closest_cpu_numa_node;
     }

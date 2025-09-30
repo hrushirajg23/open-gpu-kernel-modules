@@ -3006,10 +3006,12 @@ kchannelCtrlCmdResetIsolatedChannel_IMPL
     OBJGPU    *pGpu      = GPU_RES_GET_GPU(pKernelChannel);
     RM_API    *pRmApi    = GPU_GET_PHYSICAL_RMAPI(pGpu);
 
-
     // This ctrl sets bIsRcPending in the KernelChannel object. Because Kernel-RM is
     // the source of truth on this, it's important that this ctrl is called from CPU-RM
-    NV_ASSERT_OR_RETURN(!RMCFG_FEATURE_PLATFORM_GSP, NV_ERR_INVALID_OPERATION);
+
+    // In case of vGPU this Rmctrl gets called in GSP-RM only,
+    // this RmCtrl is issued from guest kernel RM and then called by the GSP plugin directly to GSP RM
+    // Since bIsRcPending is handled in guest, so we need to allow the call in GSP RM.
 
     // Call internal RMCTRL on physical-RM, kchannelFwdToInternalCtrl() is not
     // used because no conversion from KernelChannel to Channel is required

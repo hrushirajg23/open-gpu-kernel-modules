@@ -44,6 +44,7 @@ extern "C" {
 #ifndef CE_UTILS_H
 #define CE_UTILS_H
 
+#include "core/core.h"
 #include "gpu/gpu_resource.h" // GpuResource
 #include "class/cl0050.h"
 #include "ctrl/ctrl0050.h"
@@ -58,6 +59,8 @@ typedef struct
     NvU32 pattern;
     NvU64 flags;
     NvU64 submittedWorkId;   // Payload to poll for async completion
+    ChannelCompletionCallback pCompletionCallback;
+    void *pCompletionCallbackArg;
 } CEUTILS_MEMSET_PARAMS;
 
 typedef struct
@@ -69,6 +72,8 @@ typedef struct
     NvU64 length;
     NvU64 flags;
     NvU64 submittedWorkId;   // Payload to poll for async completion
+    ChannelCompletionCallback pCompletionCallback;
+    void *pCompletionCallbackArg;
 
     NvBool bSecureCopy; // The copy encrypts/decrypts when copying to/from unprotected memory
     NvBool bEncrypt; // Toggle encrypt/decrypt
@@ -90,6 +95,15 @@ typedef struct KernelChannel KernelChannel;
 #endif /* __nvoc_class_id_KernelChannel */
 
 
+
+typedef struct
+{
+    ChannelCompletionCallback pCallback;
+    void *pArg;
+    NvU64 payload;
+    ListNode listNode;
+} CeUtilsCallback;
+MAKE_INTRUSIVE_LIST(CeUtilsCallbackList, CeUtilsCallback, listNode);
 
 
 // Private field names are wrapped in PRIVATE_FIELD, which does nothing for
@@ -133,6 +147,10 @@ struct CeUtils {
     NvU64 lastCompletedPayload;
     NvBool bForcedCeId;
     NvU64 submissionPausedRefCount;
+    NvBool bCompletionCallbackEnabled;
+    PORT_SPINLOCK *pCallbackLock;
+    CeUtilsCallbackList completionCallbacks;
+    NVOS10_EVENT_KERNEL_CALLBACK_EX semaphoreCallback;
     struct KernelChannel *pLiteKernelChannel;
 };
 

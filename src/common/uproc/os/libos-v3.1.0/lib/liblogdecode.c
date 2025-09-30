@@ -1871,25 +1871,25 @@ NvBool isLibosPreserveLogBufferFull(LIBOS_LOG_DECODE *pLogDecode, NvU32 gpuInsta
 {
     NvU64 i = (NvU32)(pLogDecode->numLogBuffers);
     NvU32 tag = LIBOS_LOG_NVLOG_BUFFER_TAG(pLogDecode->sourceName, i * 2);
-    NVLOG_BUFFER_HANDLE handle = 0;
-    NV_STATUS status = nvlogGetBufferHandleFromTag(tag, &handle);
 
-    if (status != NV_OK)
+    //
+    // Cannot use nvlogGetBufferHandleFromTag here since in multi GPU case,
+    // we can have multiple buffers with exact same tag, only differentiable
+    // from gpuInstance
+    //
+    for (i = 0; i < NVLOG_MAX_BUFFERS; i++)
     {
-        return NV_FALSE;
-    }
-
-    NVLOG_BUFFER *pNvLogBuffer = NvLogLogger.pBuffers[handle];
-    if (pNvLogBuffer == NULL)
-    {
-        return NV_FALSE;
-    }
-
-    if (FLD_TEST_DRF(LOG_BUFFER, _FLAGS, _PRESERVE, _YES, pNvLogBuffer->flags) &&
-        DRF_VAL(LOG, _BUFFER_FLAGS, _GPU_INSTANCE, pNvLogBuffer->flags) == gpuInstance &&
-        (pNvLogBuffer->pos >= pNvLogBuffer->size - NV_OFFSETOF(LIBOS_LOG_NVLOG_BUFFER, data) - sizeof(NvU64)))
-    {
-        return NV_TRUE;
+        if (NvLogLogger.pBuffers[i] != NULL)
+        {
+            NVLOG_BUFFER *pNvLogBuffer = NvLogLogger.pBuffers[i];
+            if ((pNvLogBuffer->tag == tag) &&
+                (DRF_VAL(LOG, _BUFFER_FLAGS, _GPU_INSTANCE, pNvLogBuffer->flags) == gpuInstance) &&
+                FLD_TEST_DRF(LOG_BUFFER, _FLAGS, _PRESERVE, _YES, pNvLogBuffer->flags) &&
+                (pNvLogBuffer->pos >= pNvLogBuffer->size - NV_OFFSETOF(LIBOS_LOG_NVLOG_BUFFER, data) - sizeof(NvU64)))
+            {
+                return NV_TRUE;
+            }
+        }
     }
 
     return NV_FALSE;
@@ -1897,19 +1897,27 @@ NvBool isLibosPreserveLogBufferFull(LIBOS_LOG_DECODE *pLogDecode, NvU32 gpuInsta
 
 static NvBool findPreservedNvlogBuffer(NvU32 tag, NvU32 gpuInstance, NVLOG_BUFFER_HANDLE *pHandle)
 {
-    NVLOG_BUFFER_HANDLE handle = 0;
-    NV_STATUS status = nvlogGetBufferHandleFromTag(tag, &handle);
+    NvU64 i;
 
-    if (status != NV_OK)
-        return NV_FALSE;
-
-    NVLOG_BUFFER *pNvLogBuffer = NvLogLogger.pBuffers[handle];
-    if (FLD_TEST_DRF(LOG_BUFFER, _FLAGS, _PRESERVE, _YES, pNvLogBuffer->flags) &&
-        DRF_VAL(LOG, _BUFFER_FLAGS, _GPU_INSTANCE, pNvLogBuffer->flags) == gpuInstance &&
-        (pNvLogBuffer->pos < pNvLogBuffer->size - NV_OFFSETOF(LIBOS_LOG_NVLOG_BUFFER, data) - sizeof(NvU64)))
+    //
+    // Cannot use nvlogGetBufferHandleFromTag here since in multi GPU case,
+    // we can have multiple buffers with exact same tag, only differentiable
+    // from gpuInstance
+    //
+    for (i = 0; i < NVLOG_MAX_BUFFERS; i++)
     {
-        *pHandle = handle;
-        return NV_TRUE;
+        if (NvLogLogger.pBuffers[i] != NULL)
+        {
+            NVLOG_BUFFER *pNvLogBuffer = NvLogLogger.pBuffers[i];
+            if ((pNvLogBuffer->tag == tag) &&
+                (DRF_VAL(LOG, _BUFFER_FLAGS, _GPU_INSTANCE, pNvLogBuffer->flags) == gpuInstance) &&
+                FLD_TEST_DRF(LOG_BUFFER, _FLAGS, _PRESERVE, _YES, pNvLogBuffer->flags) &&
+                (pNvLogBuffer->pos < pNvLogBuffer->size - NV_OFFSETOF(LIBOS_LOG_NVLOG_BUFFER, data) - sizeof(NvU64)))
+            {
+                *pHandle = i;
+                return NV_TRUE;
+            }
+        }
     }
 
     return NV_FALSE;
@@ -2247,6 +2255,7 @@ void libosLogAddLogEx(LIBOS_LOG_DECODE *logDecode, void *buffer, NvU64 bufferSiz
         );
 
         NvLogLogger.pBuffers[pLog->hNvLogWrap]->pos = NV_OFFSETOF(LIBOS_LOG_NVLOG_BUFFER, data) + sizeof(NvU64); // offset to account for LIBOS buffer header and put pointer
+
     }
     else
     {
@@ -2447,6 +2456,7 @@ void libosLogUpdateTimerDelta(LIBOS_LOG_DECODE *logDecode, NvU64 localToGlobalTi
 
         pNoWrapBuf->localToGlobalTimerDelta = localToGlobalTimerDelta;
         pWrapBuf->localToGlobalTimerDelta = localToGlobalTimerDelta;
+
 #endif
         logDecode->log[i].localToGlobalTimerDelta = localToGlobalTimerDelta;
     }

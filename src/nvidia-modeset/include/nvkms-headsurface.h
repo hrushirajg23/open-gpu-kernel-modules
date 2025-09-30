@@ -123,7 +123,7 @@ NVSurfaceEvoRec *nvHsGetNvKmsSurface(const NVDevEvoRec *pDevEvo,
                                      NvKmsSurfaceHandle surfaceHandle,
                                      const NvBool requireDisplayHardwareAccess);
 
-#if NVKMS_PROCFS_ENABLE
+#if NVKMS_HEADSURFACE_STATS
 void nvHsProcFs(
     NVEvoInfoStringRec *pInfoString,
     NVDevEvoRec *pDevEvo,

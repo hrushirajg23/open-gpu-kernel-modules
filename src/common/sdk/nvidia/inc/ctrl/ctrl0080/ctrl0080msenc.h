@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2004-2020 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2004-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: MIT
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -68,7 +68,7 @@ typedef struct NV0080_CTRL_MSENC_GET_CAPS_PARAMS {
 
 
 /* size in bytes of MSENC caps table */
-#define NV0080_CTRL_MSENC_CAPS_TBL_SIZE   4
+#define NV0080_CTRL_MSENC_CAPS_TBL_SIZE   5
 
 /*
  * NV0080_CTRL_CMD_MSENC_GET_CAPS_V2

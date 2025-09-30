@@ -1584,6 +1584,19 @@ static void ReceiveDPIRQEvent(void *arg, void *pEventDataVoid, NvU32 hEvent,
         0);
 }
 
+static void ReceiveHDMIFRLRetrainEvent(void *arg, void *pEventDataVoid, NvU32 hEvent,
+                                       NvU32 Data, NV_STATUS Status)
+{
+    Nv2080HdmiFrlRequestNotification *pEventData =
+        (Nv2080HdmiFrlRequestNotification *) pEventDataVoid;
+
+    (void) nvkms_alloc_timer_with_ref_ptr(
+        nvHandleHDMIFRLRetrainEventDeferredWork, /* callback */
+        arg,    /* argument (this is a ref_ptr to a pDispEvo) */
+        pEventData->displayId, /* dataU32 */
+        0);
+}
+
 NvBool nvRmRegisterCallback(const NVDevEvoRec *pDevEvo,
                             NVOS10_EVENT_KERNEL_CALLBACK_EX *cb,
                             struct nvkms_ref_ptr *ref_ptr,
@@ -1820,6 +1833,35 @@ enum NvKmsAllocDeviceStatus nvRmAllocDisplays(NVDevEvoPtr pDevEvo)
         }
     }
 
+    // Allocate a handler for the HDMI "FRL Retraining" event, which is signaled
+    // when there's a FRL retraining request from the sink.
+    FOR_ALL_EVO_DISPLAYS(pDispEvo, sd, pDevEvo) {
+        NV2080_CTRL_EVENT_SET_NOTIFICATION_PARAMS setEventParams = { };
+        NvU32 subDevice, ret;
+
+        subDevice = pDevEvo->pSubDevices[pDispEvo->displayOwner]->handle;
+        pDispEvo->HDMIFRLRetrainEventHandle =
+            nvGenerateUnixRmHandle(&pDevEvo->handleAllocator);
+        if (!RegisterDispCallback(&pDispEvo->rmHDMIFRLRetrainCallback, pDispEvo,
+                                  pDispEvo->HDMIFRLRetrainEventHandle, ReceiveHDMIFRLRetrainEvent,
+                                  NV2080_NOTIFIERS_HDMI_FRL_RETRAINING_REQUEST)) {
+            nvEvoLogDev(pDevEvo, EVO_LOG_WARN,
+                        "Failed to register HDMI FRL retrain event");
+        }
+        // Enable HDMI FRL retrain event notifications for this subdevice.
+        setEventParams.event = NV2080_NOTIFIERS_HDMI_FRL_RETRAINING_REQUEST;
+        setEventParams.action = NV2080_CTRL_EVENT_SET_NOTIFICATION_ACTION_REPEAT;
+        if ((ret = nvRmApiControl(nvEvoGlobal.clientHandle,
+                                  subDevice,
+                                  NV2080_CTRL_CMD_EVENT_SET_NOTIFICATION,
+                                  &setEventParams,
+                                  sizeof(setEventParams)))
+                != NVOS_STATUS_SUCCESS) {
+            nvEvoLogDev(pDevEvo, EVO_LOG_WARN,
+                        "Failed to enable HDMI FRL retrain notifications (subdevice: %d) (error: 0x%x)", sd, ret);
+        }
+    }
+
     FOR_ALL_EVO_DISPLAYS(pDispEvo, sd, pDevEvo) {
         ProbeBootDisplays(pDispEvo);
 
@@ -1850,7 +1892,7 @@ void nvRmDestroyDisplays(NVDevEvoPtr pDevEvo)
     nvFreeVrrEvo(pDevEvo);
 
     FOR_ALL_EVO_DISPLAYS(pDispEvo, dispIndex, pDevEvo) {
-
+        const NvU32 subDevice = pDevEvo->pSubDevices[pDispEvo->displayOwner]->handle;
         // Before freeing anything, dump anything left in the RM's DisplayPort
         // AUX channel log.
         if (pDispEvo->dpAuxLoggingEnabled) {
@@ -1881,6 +1923,31 @@ void nvRmDestroyDisplays(NVDevEvoPtr pDevEvo)
             nvFreeUnixRmHandle(&pDevEvo->handleAllocator,
                                pDispEvo->hotplugEventHandle);
             pDispEvo->hotplugEventHandle = 0;
+        }
+
+        // Free the HDMI FRL retrain event
+        if (pDispEvo->HDMIFRLRetrainEventHandle != 0) {
+            NV2080_CTRL_EVENT_SET_NOTIFICATION_PARAMS setEventParams = { };
+
+            // Disable HDMI FRL retrain notifications for this subdevice
+            setEventParams.event = NV2080_NOTIFIERS_HDMI_FRL_RETRAINING_REQUEST;
+            setEventParams.action = NV2080_CTRL_EVENT_SET_NOTIFICATION_ACTION_DISABLE;
+            if ((ret = nvRmApiControl(nvEvoGlobal.clientHandle,
+                                      subDevice,
+                                      NV2080_CTRL_CMD_EVENT_SET_NOTIFICATION,
+                                      &setEventParams,
+                                      sizeof(setEventParams))
+                    != NVOS_STATUS_SUCCESS)) {
+                nvEvoLogDev(pDevEvo, EVO_LOG_WARN,
+                                "Failed to disable HDMI FRL retrain notifications (subdevice: %d) (error: 0x%x)", dispIndex, ret);
+            }
+
+            nvRmApiFree(nvEvoGlobal.clientHandle,
+                        nvEvoGlobal.clientHandle,
+                        pDispEvo->HDMIFRLRetrainEventHandle);
+            nvFreeUnixRmHandle(&pDevEvo->handleAllocator,
+                               pDispEvo->HDMIFRLRetrainEventHandle);
+            pDispEvo->HDMIFRLRetrainEventHandle = 0;
         }
     }
 

@@ -776,7 +776,7 @@ _kbusUpdateStaticBar1VAMapping_TU102
     for (offset = 0; offset < mapSize; offset += mapGranularity)
     {
         // Under static BAR1 mapping, BAR1 VA equal to fb physAddr plus startOffset
-        physAddr = memdescGetPhysAddr(pMemDesc, addressTranslation, offset);
+        physAddr = memdescGetPtePhysAddr(pMemDesc, addressTranslation, offset);
         vaLo     = physAddr + pKernelBus->bar1[gfid].staticBar1.startOffset;
         vaHi     = vaLo + mapGranularity - 1;
 
@@ -867,7 +867,7 @@ NV_STATUS kbusIncreaseStaticBar1Refcount_TU102
     requestedDmaFlags = kbusConvertBusMapFlagsToDmaFlags(pKernelBus, pMemDesc, busMapFlags);
 
     //
-    // If the mapping kind doesn't match, allow updating it on first reference.
+    // If the mapping kind or localization status doesn't match, allow updating it on first reference.
     // If the mapping dmaFlags don't match, don't allow updates at all since
     // static BAR1 does not handle all such updates/offsets/etc.
     //
@@ -882,7 +882,9 @@ NV_STATUS kbusIncreaseStaticBar1Refcount_TU102
         return NV_ERR_IN_USE;
     }
 
-    if (requestedKind != pKernelBus->staticBar1DefaultKind)
+    // Default static BAR1 mapping is not localized
+    if (requestedKind != pKernelBus->staticBar1DefaultKind ||
+        memdescGetFlag(pMemDesc, MEMDESC_FLAGS_ALLOC_AS_LOCALIZED))
     {
         status = _kbusUpdateStaticBar1VAMapping_TU102(pGpu, pKernelBus,
                                                      pRootMemDesc,

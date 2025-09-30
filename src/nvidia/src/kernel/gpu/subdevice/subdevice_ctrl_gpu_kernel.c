@@ -530,7 +530,7 @@ getGpuInfos(Subdevice *pSubdevice, NV2080_CTRL_GPU_GET_INFO_V2_PARAMS *pParams, 
             case NV2080_CTRL_GPU_INFO_INDEX_COMPR_BIT_BACKING_COPY_TYPE:
             {
                 MemoryManager *pMemoryManager = GPU_GET_MEMORY_MANAGER(pGpu);
-                if (!pMemoryManager->bUseVirtualCopyOnSuspend)
+                if (!IS_VIRTUAL(pGpu) && !pMemoryManager->bUseVirtualCopyOnSuspend)
                 {
                     data = NV2080_CTRL_GPU_INFO_INDEX_COMP_BIT_BACKING_COPY_TYPE_PHYSICAL;
                 }
@@ -626,12 +626,10 @@ subdeviceCtrlCmdGpuForceGspUnload_IMPL
     OBJGPU    *pGpu = GPU_RES_GET_GPU(pSubdevice);
     KernelGsp *pKernelGsp = GPU_GET_KERNEL_GSP(pGpu);
 
-    NV_CHECK_OR_RETURN(LEVEL_INFO, !IS_MIG_IN_USE(pGpu), NV_ERR_NOT_SUPPORTED);
-
     NV_CHECK_OR_RETURN(LEVEL_INFO, IS_VGPU_GSP_PLUGIN_OFFLOAD_ENABLED(pGpu), NV_ERR_NOT_SUPPORTED);
 
     // Call gsp unload now.
-    rmStatus = kgspUnloadRm(pGpu, pKernelGsp, KGSP_UNLOAD_MODE_NORMAL, GPU_STATE_FLAGS_FAST_UNLOAD);
+    rmStatus = kgspUnloadRm(pGpu, pKernelGsp, KGSP_UNLOAD_MODE_NORMAL, (GPU_STATE_FLAGS_FAST_UNLOAD|GPU_STATE_FLAGS_FORCE_GSP_UNLOAD));
 
     pKernelGsp->bFatalError = NV_TRUE;
 

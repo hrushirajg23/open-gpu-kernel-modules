@@ -3246,10 +3246,116 @@ err:
     return NULL;
 }
 
+unsigned long uvm_pmm_gpu_devmem_get_pfn(uvm_pmm_gpu_t *pmm, uvm_gpu_chunk_t *chunk)
+{
+    uvm_gpu_t *gpu = uvm_pmm_to_gpu(pmm);
+    unsigned long devmem_start = gpu->parent->devmem->pagemap.range.start;
+
+    return (devmem_start + chunk->address) >> PAGE_SHIFT;
+}
+#else // UVM_IS_CONFIG_HMM()
+static void *devmem_alloc_pagemap(unsigned long size) { return NULL; }
+static void *devmem_reuse_pagemap(unsigned long size) { return NULL; }
+#endif // UVM_IS_CONFIG_HMM()
+
+#if (UVM_CDMM_PAGES_SUPPORTED() || defined(CONFIG_PCI_P2PDMA)) && defined(NV_STRUCT_PAGE_HAS_ZONE_DEVICE_DATA)
+static void device_p2p_page_free_wake(struct nv_kref *ref)
+{
+    uvm_device_p2p_mem_t *p2p_mem = container_of(ref, uvm_device_p2p_mem_t, refcount);
+    wake_up(&p2p_mem->waitq);
+}
+
+static void device_p2p_page_free(struct page *page)
+{
+    uvm_device_p2p_mem_t *p2p_mem = page->zone_device_data;
+
+    page->zone_device_data = NULL;
+    nv_kref_put(&p2p_mem->refcount, device_p2p_page_free_wake);
+}
+#endif
+
+#if UVM_CDMM_PAGES_SUPPORTED()
+static void device_coherent_page_free(struct page *page)
+{
+    device_p2p_page_free(page);
+}
+
+static const struct dev_pagemap_ops uvm_device_coherent_pgmap_ops =
+{
+    .page_free = device_coherent_page_free,
+};
+
+static NV_STATUS uvm_pmm_cdmm_init(uvm_parent_gpu_t *parent_gpu)
+{
+    uvm_pmm_gpu_devmem_t *devmem;
+    void *ptr;
+    NV_STATUS status;
+
+    UVM_ASSERT(!uvm_hmm_is_enabled_system_wide());
+
+    list_for_each_entry(devmem, &g_uvm_global.devmem_ranges.list, list_node) {
+        if (devmem->pagemap.range.start == parent_gpu->system_bus.memory_window_start) {
+            UVM_ASSERT(devmem->pagemap.type == MEMORY_DEVICE_COHERENT);
+            UVM_ASSERT(devmem->pagemap.range.end ==
+                       SUBSECTION_ALIGN_UP(parent_gpu->system_bus.memory_window_end >> PAGE_SHIFT) << PAGE_SHIFT);
+            list_del(&devmem->list_node);
+            parent_gpu->devmem = devmem;
+            parent_gpu->device_p2p_initialised = true;
+            return NV_OK;
+        }
+    }
+
+    devmem = kzalloc(sizeof(*devmem), GFP_KERNEL);
+    if (!devmem)
+        goto err;
+
+    devmem->size = parent_gpu->system_bus.memory_window_end - parent_gpu->system_bus.memory_window_start;
+    devmem->pagemap.type = MEMORY_DEVICE_COHERENT;
+    devmem->pagemap.range.start = parent_gpu->system_bus.memory_window_start;
+    devmem->pagemap.range.end = SUBSECTION_ALIGN_UP(parent_gpu->system_bus.memory_window_end >> PAGE_SHIFT) << PAGE_SHIFT;
+    devmem->pagemap.nr_range = 1;
+    devmem->pagemap.ops = &uvm_device_coherent_pgmap_ops;
+    devmem->pagemap.owner = &g_uvm_global;
+
+    // Numa node ID doesn't matter for ZONE_DEVICE coherent pages.
+    ptr = memremap_pages(&devmem->pagemap, NUMA_NO_NODE);
+    if (IS_ERR(ptr)) {
+        UVM_ERR_PRINT("memremap_pages() err %ld\n", PTR_ERR(ptr));
+        status = errno_to_nv_status(PTR_ERR(ptr));
+        goto err_free;
+    }
+
+    parent_gpu->devmem = devmem;
+    parent_gpu->device_p2p_initialised = true;
+
+    return NV_OK;
+
+err_free:
+    kfree(devmem);
+
+err:
+    return NV_ERR_NOT_SUPPORTED;
+}
+
+static void uvm_pmm_cdmm_deinit(uvm_parent_gpu_t *parent_gpu)
+{
+    parent_gpu->device_p2p_initialised = false;
+    list_add_tail(&parent_gpu->devmem->list_node, &g_uvm_global.devmem_ranges.list);
+    parent_gpu->devmem = NULL;
+}
+#else // UVM_CDMM_PAGES_SUPPORTED
+static NV_STATUS uvm_pmm_cdmm_init(uvm_parent_gpu_t *parent_gpu) { return NV_OK; }
+static void uvm_pmm_cdmm_deinit(uvm_parent_gpu_t *parent_gpu) {}
+#endif // UVM_CDMM_PAGES_SUPPORTED
+
+#if UVM_IS_CONFIG_HMM() || UVM_CDMM_PAGES_SUPPORTED()
 NV_STATUS uvm_pmm_devmem_init(uvm_parent_gpu_t *gpu)
 {
     // Create a DEVICE_PRIVATE page for every GPU page available on the parent.
     unsigned long size = gpu->max_allocatable_address;
+
+    if (gpu->cdmm_enabled)
+        return uvm_pmm_cdmm_init(gpu);
 
     if (!uvm_hmm_is_enabled_system_wide()) {
         gpu->devmem = NULL;
@@ -3268,6 +3374,11 @@ NV_STATUS uvm_pmm_devmem_init(uvm_parent_gpu_t *gpu)
 
 void uvm_pmm_devmem_deinit(uvm_parent_gpu_t *gpu)
 {
+    if (gpu->cdmm_enabled && gpu->devmem) {
+        uvm_pmm_cdmm_deinit(gpu);
+        return;
+    }
+
     if (!gpu->devmem)
         return;
 
@@ -3282,31 +3393,18 @@ void uvm_pmm_devmem_exit(void)
     list_for_each_entry_safe(devmem, devmem_next, &g_uvm_global.devmem_ranges.list, list_node) {
         list_del(&devmem->list_node);
         memunmap_pages(&devmem->pagemap);
-        release_mem_region(devmem->pagemap.range.start, range_len(&devmem->pagemap.range));
+        if (devmem->pagemap.type == MEMORY_DEVICE_PRIVATE)
+            release_mem_region(devmem->pagemap.range.start, range_len(&devmem->pagemap.range));
         kfree(devmem);
     }
 }
-
-unsigned long uvm_pmm_gpu_devmem_get_pfn(uvm_pmm_gpu_t *pmm, uvm_gpu_chunk_t *chunk)
-{
-    uvm_gpu_t *gpu = uvm_pmm_to_gpu(pmm);
-    unsigned long devmem_start = gpu->parent->devmem->pagemap.range.start;
-
-    return (devmem_start + chunk->address) >> PAGE_SHIFT;
-}
-
-#endif // UVM_IS_CONFIG_HMM()
+#else
+NV_STATUS uvm_pmm_devmem_init(uvm_parent_gpu_t *gpu) { return NV_OK; }
+void uvm_pmm_devmem_deinit(uvm_parent_gpu_t *gpu) {}
+void uvm_pmm_devmem_exit(void) {}
+#endif
 
 #if !UVM_IS_CONFIG_HMM()
-NV_STATUS uvm_pmm_devmem_init(uvm_parent_gpu_t *gpu)
-{
-    return NV_OK;
-}
-
-void uvm_pmm_devmem_deinit(uvm_parent_gpu_t *gpu)
-{
-}
-
 static bool uvm_pmm_gpu_check_orphan_pages(uvm_pmm_gpu_t *pmm)
 {
     return true;
@@ -3318,40 +3416,31 @@ static bool uvm_pmm_gpu_check_orphan_pages(uvm_pmm_gpu_t *pmm)
 // TODO: Bug 5303506: ARM64: P2PDMA pages cannot be accessed from the CPU on
 // ARM
 #if defined(CONFIG_PCI_P2PDMA) && defined(NV_STRUCT_PAGE_HAS_ZONE_DEVICE_DATA) && !defined(NVCPU_AARCH64)
-static void device_p2p_page_free_wake(struct nv_kref *ref)
-{
-    uvm_device_p2p_mem_t *p2p_mem = container_of(ref, uvm_device_p2p_mem_t, refcount);
-    wake_up(&p2p_mem->waitq);
-}
-
-static void device_p2p_page_free(struct page *page)
-{
-    uvm_device_p2p_mem_t *p2p_mem = page->zone_device_data;
-
-    page->zone_device_data = NULL;
-    nv_kref_put(&p2p_mem->refcount, device_p2p_page_free_wake);
-}
 
 static const struct dev_pagemap_ops uvm_device_p2p_pgmap_ops =
 {
     .page_free = device_p2p_page_free,
 };
 
-void uvm_pmm_gpu_device_p2p_init(uvm_gpu_t *gpu)
+void uvm_pmm_gpu_device_p2p_init(uvm_parent_gpu_t *parent_gpu)
 {
-    unsigned long pci_start_pfn = pci_resource_start(gpu->parent->pci_dev,
-                                                     uvm_device_p2p_static_bar(gpu)) >> PAGE_SHIFT;
-    unsigned long pci_end_pfn = pci_start_pfn + (gpu->mem_info.static_bar1_size >> PAGE_SHIFT);
+    unsigned long pci_start_pfn = pci_resource_start(parent_gpu->pci_dev,
+                                                     uvm_device_p2p_static_bar(parent_gpu)) >> PAGE_SHIFT;
+    unsigned long pci_end_pfn = pci_start_pfn + (parent_gpu->static_bar1_size >> PAGE_SHIFT);
     struct page *p2p_page;
 
-    gpu->device_p2p_initialised = false;
-    uvm_mutex_init(&gpu->device_p2p_lock, UVM_LOCK_ORDER_GLOBAL);
+    if (uvm_parent_gpu_is_coherent(parent_gpu)) {
+        // P2PDMA support with CDMM enabled requires special
+        // MEMORY_DEVICE_COHERENT pages to have been allocated which will have
+        // also set the p2p initialised state if successful.
+        if (parent_gpu->cdmm_enabled)
+            return;
 
-    if (uvm_parent_gpu_is_coherent(gpu->parent)) {
-        // A coherent system uses normal struct pages.
-        gpu->device_p2p_initialised = true;
+        parent_gpu->device_p2p_initialised = true;
         return;
     }
+
+    parent_gpu->device_p2p_initialised = false;
 
     // RM sets static_bar1_size when it has created a contiguous BAR mapping
     // large enough to cover all of GPU memory that will be allocated to
@@ -3364,10 +3453,10 @@ void uvm_pmm_gpu_device_p2p_init(uvm_gpu_t *gpu)
     // can be disabled by setting the RmForceDisableIomapWC regkey which allows
     // creation of the P2PDMA pages.
     // TODO: Bug 5044562: P2PDMA pages require the PCIe BAR to be mapped UC
-    if (!gpu->mem_info.static_bar1_size || gpu->mem_info.static_bar1_write_combined)
+    if (!parent_gpu->static_bar1_size || parent_gpu->static_bar1_write_combined)
         return;
 
-    if (pci_p2pdma_add_resource(gpu->parent->pci_dev, uvm_device_p2p_static_bar(gpu), 0, 0)) {
+    if (pci_p2pdma_add_resource(parent_gpu->pci_dev, uvm_device_p2p_static_bar(parent_gpu), 0, 0)) {
         UVM_ERR_PRINT("Unable to initialse PCI P2PDMA pages\n");
         return;
     }
@@ -3383,46 +3472,40 @@ void uvm_pmm_gpu_device_p2p_init(uvm_gpu_t *gpu)
     for (; page_to_pfn(p2p_page) < pci_end_pfn; p2p_page++)
         p2p_page->zone_device_data = NULL;
 
-    gpu->device_p2p_initialised = true;
+    parent_gpu->device_p2p_initialised = true;
 }
 
-void uvm_pmm_gpu_device_p2p_deinit(uvm_gpu_t *gpu)
+void uvm_pmm_gpu_device_p2p_deinit(uvm_parent_gpu_t *parent_gpu)
 {
-    unsigned long pci_start_pfn = pci_resource_start(gpu->parent->pci_dev,
-                                                     uvm_device_p2p_static_bar(gpu)) >> PAGE_SHIFT;
+    unsigned long pci_start_pfn = pci_resource_start(parent_gpu->pci_dev,
+                                                     uvm_device_p2p_static_bar(parent_gpu)) >> PAGE_SHIFT;
     struct page *p2p_page;
 
-    if (gpu->device_p2p_initialised && !uvm_parent_gpu_is_coherent(gpu->parent)) {
+    if (parent_gpu->device_p2p_initialised && !uvm_parent_gpu_is_coherent(parent_gpu)) {
         p2p_page = pfn_to_page(pci_start_pfn);
-        devm_memunmap_pages(&gpu->parent->pci_dev->dev, page_pgmap(p2p_page));
+        devm_memunmap_pages(&parent_gpu->pci_dev->dev, page_pgmap(p2p_page));
     }
 
-    gpu->device_p2p_initialised = false;
+    parent_gpu->device_p2p_initialised = false;
 }
 #else // CONFIG_PCI_P2PDMA
 
 // Coherent platforms can do P2PDMA without CONFIG_PCI_P2PDMA
-void uvm_pmm_gpu_device_p2p_init(uvm_gpu_t *gpu)
+void uvm_pmm_gpu_device_p2p_init(uvm_parent_gpu_t *parent_gpu)
 {
-    gpu->device_p2p_initialised = false;
-    uvm_mutex_init(&gpu->device_p2p_lock, UVM_LOCK_ORDER_GLOBAL);
-
-    if (uvm_parent_gpu_is_coherent(gpu->parent)) {
-        // CDMM implies that there are no struct pages corresponding to
-        // the GPU memory. P2PDMA struct pages which are required for
-        // device P2P mappings are not currently supported on ARM.
-        if (gpu->mem_info.cdmm_enabled)
+    if (uvm_parent_gpu_is_coherent(parent_gpu)) {
+        if (parent_gpu->cdmm_enabled)
             return;
 
         // A coherent system uses normal struct pages.
-        gpu->device_p2p_initialised = true;
+        parent_gpu->device_p2p_initialised = true;
         return;
     }
 }
 
-void uvm_pmm_gpu_device_p2p_deinit(uvm_gpu_t *gpu)
+void uvm_pmm_gpu_device_p2p_deinit(uvm_parent_gpu_t *parent_gpu)
 {
-    gpu->device_p2p_initialised = false;
+    parent_gpu->device_p2p_initialised = false;
 }
 #endif // CONFIG_PCI_P2PDMA
 

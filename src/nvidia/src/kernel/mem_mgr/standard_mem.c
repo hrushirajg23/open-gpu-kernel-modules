@@ -56,6 +56,11 @@ NV_STATUS stdmemValidateParams
         return NV_ERR_INVALID_ARGUMENT;
     }
 
+    if (pAllocData->size == 0)
+    {
+        return NV_ERR_INVALID_ARGUMENT;
+    }
+
     //
     // These flags don't do anything in this path. No mapping on alloc and
     // kernel map is controlled by TYPE

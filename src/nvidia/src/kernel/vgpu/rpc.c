@@ -2067,7 +2067,7 @@ static NV_STATUS _issueRpcLarge
     // Set the correct length for this queue entry.
     vgpu_rpc_message_header_v->length = entryLength;
 
-    nvStatus = rpcSendMessage(pGpu, pRpc, &firstSequence);
+    nvStatus = rpcSendMessage(pGpu, pRpc, &lastSequence);
     if (nvStatus != NV_OK)
     {
         NV_PRINTF(LEVEL_ERROR, "rpcSendMessage failed with status 0x%08x for fn %d!\n",
@@ -10619,7 +10619,8 @@ NV_STATUS rpcGspSetSystemInfo_v17_00
         rpcInfo->sysTimerOffsetNs = pTmr->sysTimerOffsetNs;
 
         rpcInfo->bIsPrimary = pGpu->getProperty(pGpu, PDB_PROP_GPU_PRIMARY_DEVICE);
-
+        rpcInfo->bIsUnixHdmiFrlComplianceEnabled =
+            pGpu->getProperty(pGpu, PDB_PROP_GPU_UNIX_HDMI_FRL_COMPLIANCE_ENABLED);
         rpcInfo->bS0ixSupport = pSys->getProperty(pSys, PDB_PROP_SYS_SUPPORTS_S0IX);
 #if defined(NV_UNIX) && !RMCFG_FEATURE_MODS_FEATURES
         rpcInfo->isGridBuild = os_is_grid_supported();

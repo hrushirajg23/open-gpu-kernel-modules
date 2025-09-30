@@ -26,6 +26,7 @@
 #include "virtualization/hypervisor/hypervisor.h"
 
 #include "ctrl/ctrl2080/ctrl2080gpu.h"
+#include "nvdevid.h"
 
 #if PORT_MEM_TRACK_USE_LIMIT
 ct_assert(PORT_MEM_LIMIT_MAX_GFID == VGPU_MAX_GFID);
@@ -367,4 +368,11 @@ NvU32 vgpuMgrGetSwrlCountToAllocate(OBJGPU *pGpu)
     }
 
     return num_swrl;
+}
+
+NvU16 vgpuMgrGetVgpuSsvid(OBJGPU *pGpu)
+{
+    NvU16 vgpuSsvid = NV_PCI_SUBID_VENDOR_NVIDIA;
+
+    return vgpuSsvid;
 }

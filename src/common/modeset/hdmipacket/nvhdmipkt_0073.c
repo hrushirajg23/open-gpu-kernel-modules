@@ -308,12 +308,15 @@ hdmiWriteDummyPacketCtrl(NVHDMIPKT_CLASS*  pThis,
 }
 
 NVHDMIPKT_RESULT
-hdmiAssessLinkCapabilitiesDummy(NVHDMIPKT_CLASS             *pThis,
-                                NvU32                        subDevice,
-                                NvU32                        displayId,
+hdmiAssessLinkCapabilitiesDummy(NVHDMIPKT_CLASS      *pThis,
+                                NvU32                 subDevice,
+                                NvU32                 displayId,
                                 NVT_EDID_INFO         const * const pSinkEdid,
-                                HDMI_SRC_CAPS               *pSrcCaps,
-                                HDMI_SINK_CAPS              *pSinkCaps)
+                                const NvBool          bPerformLinkTrainingToAssess,
+                                const NvBool          bIsDisplayActive,
+                                HDMI_FRL_DATA_RATE    currFRLRate,
+                                HDMI_SRC_CAPS        *pSrcCaps,
+                                HDMI_SINK_CAPS       *pSinkCaps)
 {
     NvHdmiPkt_Print(pThis, "ERROR - Dummy function hdmiAssessLinkCapabilitiesDummy called. "
                            "Should never be called.");

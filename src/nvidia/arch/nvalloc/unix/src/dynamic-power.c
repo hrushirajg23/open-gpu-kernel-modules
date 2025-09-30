@@ -3008,7 +3008,7 @@ void RmInitPowerManagement(
             nvp->gc6_upstream_port_configured = RmConfigureUpstreamPortForRTD3(nv, NV_TRUE);
         }
 
-        nv->is_pm_supported = pGpu->getProperty(pGpu, PDB_PROP_GPU_POWER_MANAGEMENT_SUPPORTED);
+        nv->is_pm_unsupported = pGpu->getProperty(pGpu, PDB_PROP_GPU_POWER_MANAGEMENT_UNSUPPORTED);
 
         // UNLOCK: release GPUs lock
         rmGpuLocksRelease(GPUS_LOCK_FLAGS_NONE, NULL);

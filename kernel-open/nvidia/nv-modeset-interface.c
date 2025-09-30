@@ -83,6 +83,7 @@ static NvU32 nvidia_modeset_enumerate_gpus(nv_gpu_info_t *gpu_info)
     for (nvl = nv_linux_devices; nvl != NULL; nvl = nvl->next)
     {
         nv_state_t *nv = NV_STATE_PTR(nvl);
+        int numa_status = nv_get_numa_status(nvl);
 
         /*
          * The gpu_info[] array has NV_MAX_GPUS elements.  Fail if there
@@ -101,6 +102,10 @@ static NvU32 nvidia_modeset_enumerate_gpus(nv_gpu_info_t *gpu_info)
         gpu_info[count].pci_info.bus      = nv->pci_info.bus;
         gpu_info[count].pci_info.slot     = nv->pci_info.slot;
         gpu_info[count].pci_info.function = nv->pci_info.function;
+
+        gpu_info->needs_numa_setup =
+            numa_status != NV_IOCTL_NUMA_STATUS_DISABLED &&
+            numa_status != NV_IOCTL_NUMA_STATUS_ONLINE;
 
         gpu_info[count].os_device_ptr = nvl->dev;
 

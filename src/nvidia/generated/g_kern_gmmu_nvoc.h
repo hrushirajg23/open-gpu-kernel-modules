@@ -544,7 +544,6 @@ struct KernelGmmu {
 //  NvBool PDB_PROP_KGMMU_IS_MISSING inherited from OBJENGSTATE
 
     // Data members
-    NvBool bReportFlaTranslationXid;
     MEMORY_DESCRIPTOR *pFakeSparseBuffer;
     NvU64 fakeSparseEntry[3];
     NV2080_CTRL_INTERNAL_GMMU_GET_STATIC_INFO_PARAMS *pStaticInfo;
@@ -719,7 +718,6 @@ struct KernelGmmu_PRIVATE {
 //  NvBool PDB_PROP_KGMMU_IS_MISSING inherited from OBJENGSTATE
 
     // Data members
-    NvBool bReportFlaTranslationXid;
     MEMORY_DESCRIPTOR *pFakeSparseBuffer;
     NvU64 fakeSparseEntry[3];
     NV2080_CTRL_INTERNAL_GMMU_GET_STATIC_INFO_PARAMS *pStaticInfo;

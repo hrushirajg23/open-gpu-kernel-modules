@@ -77,7 +77,7 @@ public:
     NV_STATUS khfrpMailboxQueueMessage(KernelHFRP *pHfrp, NvU32 messageHeader, NvU8 *pPayloadArray,
                                       NvU32 payloadSize, NvU32 mailboxFlag);
 
-    void khfrpServiceEvent(KernelHFRP *pHfrp);
+    NV_STATUS khfrpServiceEvent(KernelHFRP *pHfrp);
 
     NvU32 khfrpAllocateSequenceId(KernelHFRP *pHfrp, NvU16 *pResponseStatus, void *pResponsePayload,
                                       NvU32 *pResponsePayloadSize, NV_STATUS *pStatus, NvU32 *pSequenceId);
@@ -91,7 +91,7 @@ public:
     NV_STATUS khfrpPollOnIrqRm(KernelHFRP *pHfrp, NvU32 irqRegAddr, NvU32 bitIndex, NvBool bData);
 
     NV_STATUS khfrpPostCommandBlocking(KernelHFRP *pHfrp, NvU16 commandIndex, void *pCommandPayload, NvU32 commandPayloadSize,
-                                           NvU16 *pResponseStatus, void *pResponsePayload, NvU32 *pResponsePayloadSize,  NV_STATUS *pStatus);
+                                           NvU16 *pResponseStatus, void *pResponsePayload, NvU32 *pResponsePayloadSize);
 
     NV_STATUS khfrpInterfaceReset(KernelHFRP *pHfrp);
 

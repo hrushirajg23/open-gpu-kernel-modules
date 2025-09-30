@@ -1025,10 +1025,8 @@ void nvEvoSetDpVscSdp(NVDispEvoPtr pDispEvo,
 
     nvPushEvoSubDevMaskDisp(pDispEvo);
 
-    if (((pDpyColor->format == NV_KMS_DPY_ATTRIBUTE_CURRENT_COLOR_SPACE_YCbCr420) ||
-         (pDpyColor->colorimetry == NVKMS_OUTPUT_COLORIMETRY_BT2100)) &&
-        ((pTimings->protocol == NVKMS_PROTOCOL_SOR_DP_A) ||
-         (pTimings->protocol == NVKMS_PROTOCOL_SOR_DP_B))) {
+    if (pTimings->protocol == NVKMS_PROTOCOL_SOR_DP_A ||
+        pTimings->protocol == NVKMS_PROTOCOL_SOR_DP_B) {
         DPSDP_DP_VSC_SDP_DESCRIPTOR sdp = { };
         nvConstructDpVscSdp(pInfoFrame, pDpyColor, &sdp);
         pDevEvo->hal->SetDpVscSdp(pDispEvo, head, &sdp, updateState);
@@ -3048,12 +3046,23 @@ void nvUpdateCurrentHardwareColorSpaceAndRangeEvo(
             case NV_KMS_DPY_ATTRIBUTE_CURRENT_COLOR_SPACE_YCbCr444:
             case NV_KMS_DPY_ATTRIBUTE_CURRENT_COLOR_SPACE_YCbCr422:
             case NV_KMS_DPY_ATTRIBUTE_CURRENT_COLOR_SPACE_YCbCr420:
-                if (pDpyColor->colorimetry == NVKMS_OUTPUT_COLORIMETRY_BT2100) {
+                switch (pDpyColor->colorimetry) {
+                case NVKMS_OUTPUT_COLORIMETRY_BT2100:
                     pHeadState->procAmp.colorimetry = NVT_COLORIMETRY_BT2020YCC;
-                } else if (nvEvoIsHDQualityVideoTimings(&pHeadState->timings)) {
+                    break;
+                case NVKMS_OUTPUT_COLORIMETRY_BT709:
                     pHeadState->procAmp.colorimetry = NVT_COLORIMETRY_YUV_709;
-                } else {
+                    break;
+                case NVKMS_OUTPUT_COLORIMETRY_BT601:
                     pHeadState->procAmp.colorimetry = NVT_COLORIMETRY_YUV_601;
+                    break;
+                case NVKMS_OUTPUT_COLORIMETRY_DEFAULT:
+                    if (nvEvoIsHDQualityVideoTimings(&pHeadState->timings)) {
+                        pHeadState->procAmp.colorimetry = NVT_COLORIMETRY_YUV_709;
+                    } else {
+                        pHeadState->procAmp.colorimetry = NVT_COLORIMETRY_YUV_601;
+                    }
+                    break;
                 }
                 break;
             default:
@@ -6867,10 +6876,19 @@ ConstructHwModeTimingsViewPort(const NVDispEvoRec *pDispEvo,
 }
 
 
-static NvBool GetDefaultFrlDpyColor(
+static NvBool FrlOverrideForYCbCr422(
+    const NVDevEvoRec *pDevEvo,
     const NvKmsDpyOutputColorFormatInfo *pColorFormatsInfo,
     NVDpyAttributeColor *pDpyColor)
 {
+    /*
+     * If the hardware natively supports YCbCr422 + FRL,
+     * there is nothing to do.
+     */
+    if (pDevEvo->hal->caps.supportsYCbCr422OverHDMIFRL) {
+        return TRUE;
+    }
+
     nvkms_memset(pDpyColor, 0, sizeof(*pDpyColor));
     pDpyColor->colorimetry = NVKMS_OUTPUT_COLORIMETRY_DEFAULT;
 
@@ -6916,14 +6934,18 @@ static NvBool GetDfpHdmiProtocol(
           NVKMS_MODE_VALIDATION_REQUIRE_BOOT_CLOCKS) == 0) &&
         (!nvHdmiIsTmdsPossible(pDpyEvo, pTimings, pDpyColor) ||
          nvGetPreferHdmiFrlMode(pDevEvo, pValidationParams)) &&
-         /* If FRL is supported... */
-         nvHdmiDpySupportsFrl(pDpyEvo)) {
+         /* If FRL is possible... */
+         nvHdmiIsFrlPossible(pDpyEvo)) {
 
-        /* Hardware does not support HDMI FRL with YUV422 */
-        if ((pDpyColor->format ==
-                NV_KMS_DPY_ATTRIBUTE_CURRENT_COLOR_SPACE_YCbCr422) &&
-                !GetDefaultFrlDpyColor(&colorFormatsInfo, pDpyColor)) {
-            return FALSE;
+        /*
+         * Not all hardware configurations support YCbCr422 with FRL;
+         * override if necessary, or fail FRL.
+         */
+        if (pDpyColor->format ==
+                NV_KMS_DPY_ATTRIBUTE_CURRENT_COLOR_SPACE_YCbCr422) {
+            if (!FrlOverrideForYCbCr422(pDevEvo, &colorFormatsInfo, pDpyColor)) {
+                return FALSE;
+            }
         }
 
         *pTimingsProtocol = NVKMS_PROTOCOL_SOR_HDMI_FRL;

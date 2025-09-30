@@ -63,6 +63,8 @@ void dpPrintf(DP_LOG_LEVEL severity, const char *format, ...)
 {
     if (severity == DP_SILENT) return;
 
+    if (!nvDoDebugLogging()) return;
+
     va_list ap;
     va_start(ap, format);
     nvVEvoLog(dpSeverityToNvkmsMap(severity), NV_INVALID_GPU_LOG_INDEX, format, ap);

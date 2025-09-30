@@ -246,11 +246,14 @@ kfspCanSendPacket_GH100
 {
     NvU32 cmdqHead;
     NvU32 cmdqTail;
+    NvU32 msgqHead;
+    NvU32 msgqTail;
 
     _kfspGetQueueHeadTail_GH100(pGpu, pKernelFsp, &cmdqHead, &cmdqTail);
+    _kfspGetMsgQueueHeadTail_GH100(pGpu, pKernelFsp, &msgqHead, &msgqTail);
 
     // FSP will set QUEUE_HEAD = TAIL after each packet is received
-    return (cmdqHead == cmdqTail);
+    return (cmdqHead == cmdqTail) && (msgqHead == msgqTail);
 }
 
 /*!

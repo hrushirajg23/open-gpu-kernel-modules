@@ -8146,6 +8146,7 @@ NVEvoHAL nvEvoC3 = {
         FALSE,                                    /* supportsDPAudio192KHz */
         FALSE,                                    /* supportsInputColorSpace */
         FALSE,                                    /* supportsInputColorRange */
+        FALSE,                                    /* supportsYCbCr422OverHDMIFRL */
         NV_EVO3_SUPPORTED_DITHERING_MODES,        /* supportedDitheringModes */
         sizeof(NVC372_CTRL_IS_MODE_POSSIBLE_PARAMS), /* impStructSize */
         NV_EVO_SCALER_2TAPS,                      /* minScalerTaps */
@@ -8244,6 +8245,7 @@ NVEvoHAL nvEvoC5 = {
         FALSE,                                    /* supportsDPAudio192KHz */
         TRUE,                                     /* supportsInputColorSpace */
         TRUE,                                     /* supportsInputColorRange */
+        FALSE,                                    /* supportsYCbCr422OverHDMIFRL */
         NV_EVO3_SUPPORTED_DITHERING_MODES,        /* supportedDitheringModes */
         sizeof(NVC372_CTRL_IS_MODE_POSSIBLE_PARAMS), /* impStructSize */
         NV_EVO_SCALER_2TAPS,                      /* minScalerTaps */
@@ -8342,6 +8344,7 @@ NVEvoHAL nvEvoC6 = {
         FALSE,                                    /* supportsDPAudio192KHz */
         TRUE,                                     /* supportsInputColorSpace */
         TRUE,                                     /* supportsInputColorRange */
+        FALSE,                                    /* supportsYCbCr422OverHDMIFRL */
         NV_EVO3_SUPPORTED_DITHERING_MODES,        /* supportedDitheringModes */
         sizeof(NVC372_CTRL_IS_MODE_POSSIBLE_PARAMS), /* impStructSize */
         NV_EVO_SCALER_2TAPS,                      /* minScalerTaps */

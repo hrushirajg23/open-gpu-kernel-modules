@@ -143,7 +143,7 @@ static void ats_batch_select_residency(uvm_gpu_va_space_t *gpu_va_space,
 {
     uvm_gpu_t *gpu = gpu_va_space->gpu;
     int residency;
-    bool cdmm_enabled = gpu->mem_info.cdmm_enabled;
+    bool cdmm_enabled = gpu->parent->cdmm_enabled;
 
     if (gpu->parent->is_integrated_gpu || cdmm_enabled) {
         residency = gpu->parent->closest_cpu_numa_node;

@@ -838,8 +838,12 @@ loop_begin:
     }
     for (i = 0; i < PMA_BITS_PER_PAGE; i++)
     {
+        //
         // TODO, merge logic so we don't need multiple calls for unpin
-        if (i == MAP_IDX_ALLOC_UNPIN && bSearchEvictable)
+        //
+        // Persistent pages may still be evictable, so skip checking for ATTRIB_PERSISTENT here as well.
+        //
+        if (((i == MAP_IDX_ALLOC_UNPIN) || (i == MAP_IDX_PERSISTENT)) && bSearchEvictable)
         {
             continue;
         }
@@ -944,8 +948,12 @@ loop_begin:
     }
     for (i = 0; i < PMA_BITS_PER_PAGE; i++)
     {
+        //
         // TODO, merge logic so we don't need multiple calls for unpin
-        if (i == MAP_IDX_ALLOC_UNPIN && bSearchEvictable)
+        //
+        // Persistent pages may still be evictable, so skip checking for ATTRIB_PERSISTENT here as well.
+        //
+        if (((i == MAP_IDX_ALLOC_UNPIN) || (i == MAP_IDX_PERSISTENT)) && bSearchEvictable)
         {
             continue;
         }
@@ -1143,8 +1151,12 @@ loop_begin:
             continue;
         }
 
+        //
         // If array is not already full of evictable and free pages, go to evictable loop
-        if ((i != MAP_IDX_ALLOC_UNPIN) || (curEvictPage <= totalFound))
+        //
+        // Persistent pages may still be evictable, so go to evictable loop for ATTRIB_PERSISTENT.
+        //
+        if (((i != MAP_IDX_ALLOC_UNPIN) && (i != MAP_IDX_PERSISTENT)) || (curEvictPage <= totalFound))
         {
             while (latestFree[i] < (frameBaseIdx + framesPerPage))
             {
@@ -1297,8 +1309,12 @@ loop_begin:
 
     for (i = 0; i < PMA_BITS_PER_PAGE; i++)
     {
+        //
         // If array is not already full of evictable and free pages, go to evictable loop
-        if ((i != MAP_IDX_ALLOC_UNPIN) || (curEvictPage <= totalFound))
+        //
+        // Persistent pages may still be evictable, so go to evictable loop for ATTRIB_PERSISTENT.
+        //
+        if (((i != MAP_IDX_ALLOC_UNPIN) && (i != MAP_IDX_PERSISTENT)) || (curEvictPage <= totalFound))
         {
             while (latestFree[i] > (frameBaseIdx - framesPerPage))
             {

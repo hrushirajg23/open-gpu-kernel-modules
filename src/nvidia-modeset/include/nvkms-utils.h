@@ -279,7 +279,7 @@ void nvEvoDestroyApiHandles(NVEvoApiHandlesPtr pEvoApiHandles);
          (_pointer) = nvEvoGetPointerFromApiHandleNext(_pEvoApiHandles, \
                                                        &(_handle)))
 
-
+NvBool nvDoDebugLogging(void);
 
 #ifdef __cplusplus
 };

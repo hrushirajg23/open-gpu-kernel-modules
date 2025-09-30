@@ -445,6 +445,14 @@ __nv_drm_connector_atomic_check(struct drm_connector *connector,
             req_config->modeSetConfig.colorimetry =
                 NVKMS_OUTPUT_COLORIMETRY_DEFAULT;
             break;
+        case DRM_MODE_COLORIMETRY_BT601_YCC:
+            req_config->modeSetConfig.colorimetry =
+                NVKMS_OUTPUT_COLORIMETRY_BT601;
+            break;
+        case DRM_MODE_COLORIMETRY_BT709_YCC:
+            req_config->modeSetConfig.colorimetry =
+                NVKMS_OUTPUT_COLORIMETRY_BT709;
+            break;
         case DRM_MODE_COLORIMETRY_BT2020_RGB:
         case DRM_MODE_COLORIMETRY_BT2020_YCC:
             // Ignore RGB/YCC

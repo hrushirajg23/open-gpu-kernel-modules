@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: MIT
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -58,14 +58,20 @@ kgmmuCheckPendingInvalidates_TU102
 
     while (1)
     {
-        NvU32 regVal = GPU_VREG_RD32(pGpu, NV_VIRTUAL_FUNCTION_PRIV_MMU_INVALIDATE);
+        NvU32 regVal;
+
+        if (API_GPU_IN_RESET_SANITY_CHECK(pGpu)) 
+        {
+            status = NV_ERR_GPU_IN_FULLCHIP_RESET;
+            break;
+        }
+
+        regVal = GPU_VREG_RD32(pGpu, NV_VIRTUAL_FUNCTION_PRIV_MMU_INVALIDATE);
 
         if (FLD_TEST_DRF(_VIRTUAL_FUNCTION_PRIV, _MMU_INVALIDATE, _TRIGGER, _FALSE, regVal))
             break;
 
-        if (API_GPU_IN_RESET_SANITY_CHECK(pGpu))
-            status = NV_ERR_GPU_IN_FULLCHIP_RESET;
-        else if (!API_GPU_ATTACHED_SANITY_CHECK(pGpu))
+       if (!API_GPU_ATTACHED_SANITY_CHECK(pGpu))
             status = NV_ERR_GPU_IS_LOST;
         else
             status = gpuCheckTimeout(pGpu, pTimeOut);

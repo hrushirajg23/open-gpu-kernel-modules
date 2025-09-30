@@ -54,6 +54,7 @@ CFLAGS += -D__NO_CTYPE
 
 CFLAGS += -DNV_CPU_INTRINSICS_KERNEL
 CFLAGS += -DNVHDMIPKT_RM_CALLS_INTERNAL=0
+CFLAGS += -DNVHDMIPKT_NVKMS
 
 # XXX it would be nice to only define these for appropriate files...
 CFLAGS += -DSOFTFLOAT_ROUND_ODD

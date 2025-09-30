@@ -1854,7 +1854,7 @@ memmgrDeterminePageSize_IMPL
             {
                 NV_PRINTF(LEVEL_ERROR,
                           "Big/Huge/512MB/256GB page size not supported in sysmem.\n");
-                NV_ASSERT_OR_RETURN(0, 0);
+                return 0;
             }
             else
             {
@@ -1867,7 +1867,7 @@ memmgrDeterminePageSize_IMPL
             {
                 case RM_ATTR_PAGE_SIZE_INVALID:
                     NV_PRINTF(LEVEL_ERROR, "invalid page size attr\n");
-                    NV_ASSERT_OR_RETURN(0, 0);
+                    return 0;
 
                 case RM_ATTR_PAGE_SIZE_DEFAULT:
                 {
@@ -1901,7 +1901,7 @@ memmgrDeterminePageSize_IMPL
                     }
                     else
                     {
-                        NV_ASSERT_OR_RETURN(0, 0);
+                        return 0;
                     }
                     break;
 
@@ -1912,7 +1912,7 @@ memmgrDeterminePageSize_IMPL
                     }
                     else
                     {
-                        NV_ASSERT_OR_RETURN(0, 0);
+                        return 0;
                     }
                     break;
 
@@ -1923,11 +1923,11 @@ memmgrDeterminePageSize_IMPL
                     }
                     else
                     {
-                        NV_ASSERT_OR_RETURN(0, 0);
+                        return 0;
                     }
                     break;
                 default:
-                    NV_ASSERT(0);
+                    return 0;
             }
         }
     }
@@ -1958,7 +1958,7 @@ memmgrDeterminePageSize_IMPL
             *pRetAttr2 = FLD_SET_DRF(OS32, _ATTR2, _PAGE_SIZE_HUGE, _256GB,  *pRetAttr2);
             break;
         default:
-            NV_ASSERT(0);
+            return 0;
     }
 
     return pageSize;

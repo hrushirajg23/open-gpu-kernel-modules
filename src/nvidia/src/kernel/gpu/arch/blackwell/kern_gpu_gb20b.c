@@ -199,6 +199,7 @@ gpuPowerOn_GB20B(OBJGPU *pGpu)
 
     NV_STATUS   status       = NV_OK;
     NvU32       responseSize = 0;
+    NvU16       responseStatus = 0U;
     KernelHFRP *pKernelHfrp  = GPU_GET_KERNEL_HFRP(pGpu);
 
     CMD_SOC_SET_DEVICE_POWER_STATE_PARAMS powerState;
@@ -213,13 +214,24 @@ gpuPowerOn_GB20B(OBJGPU *pGpu)
     }
 
     status = khfrpPostCommandBlocking(pKernelHfrp, HFRP_CMD_SOC_SET_DEVICE_POWER_STATE, &powerState, sizeof(powerState),
-                 NULL, NULL, &responseSize, &status);
+                 &responseStatus, NULL, &responseSize);
+
     if (status != NV_OK)
     {
         NV_PRINTF(LEVEL_ERROR,
-                  "ERROR: HFRP_CMD_fialed to turn off SOC power\n");
+                  "ERROR: HFRP_CMD_fialed to turn on iGPU power with status = 0x%x\n",
+                  status);
         return status;
     }
+
+    if (responseStatus != 0U)
+    {
+        NV_PRINTF(LEVEL_ERROR,
+                  "ERROR: HFRP_CMD_fialed to turn on iGPU power with HFRP response status = 0x%x\n",
+                  responseStatus);
+        return NV_ERR_GENERIC;
+    }
+
     return status;
 }
 /*!
@@ -239,6 +251,7 @@ gpuPowerOff_GB20B(OBJGPU *pGpu)
 {
     NV_STATUS   status       = NV_OK;
     NvU32       responseSize = 0;
+    NvU16       responseStatus = 0U;
     KernelHFRP *pKernelHfrp  = GPU_GET_KERNEL_HFRP(pGpu);
 
     CMD_SOC_SET_DEVICE_POWER_STATE_PARAMS powerState;
@@ -253,13 +266,22 @@ gpuPowerOff_GB20B(OBJGPU *pGpu)
     }
 
     status = khfrpPostCommandBlocking(pKernelHfrp, HFRP_CMD_SOC_SET_DEVICE_POWER_STATE, &powerState, sizeof(powerState),
-                 NULL, NULL, &responseSize, &status);
+                 &responseStatus, NULL, &responseSize);
 
     if (status != NV_OK)
     {
         NV_PRINTF(LEVEL_ERROR,
-                  "ERROR: HFRP_CMD_fialed to turn off SOC power\n");
+                  "ERROR: HFRP_CMD_fialed to turn off iGPU power with status = 0x%x\n",
+                  status);
         return status;
+    }
+
+    if (responseStatus != 0U)
+    {
+        NV_PRINTF(LEVEL_ERROR,
+                  "ERROR: HFRP_CMD_fialed to turn off iGPU power with HFRP response status = 0x%x\n",
+                  responseStatus);
+        return NV_ERR_GENERIC;
     }
 
     return status;

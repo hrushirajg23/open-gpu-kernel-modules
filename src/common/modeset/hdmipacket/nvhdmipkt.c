@@ -385,6 +385,28 @@ NvHdmi_AssessLinkCapabilities(NvHdmiPkt_Handle             libHandle,
                               HDMI_SRC_CAPS               *pSrcCaps,
                               HDMI_SINK_CAPS              *pSinkCaps)
 {
+    return NvHdmi_AssessLinkCapabilities2(libHandle,
+                                          subDevice,
+                                          displayId,
+                                          pSinkEdid,
+                                          NV_FALSE /* bPerformLinkTrainingToAssess */,
+                                          NV_FALSE /* bIsDisplayActive */,
+                                          HDMI_FRL_DATA_RATE_NONE /* currFRLRate */,
+                                          pSrcCaps,
+                                          pSinkCaps);
+}
+
+NVHDMIPKT_RESULT
+NvHdmi_AssessLinkCapabilities2(NvHdmiPkt_Handle             libHandle,
+                               NvU32                        subDevice,
+                               NvU32                        displayId,
+                               NVT_EDID_INFO         const * const pSinkEdid,
+                               const NvBool                 bPerformLinkTrainingToAssess,
+                               const NvBool                 bIsDisplayActive,
+                               const HDMI_FRL_DATA_RATE     currFRLRate,
+                               HDMI_SRC_CAPS               *pSrcCaps,
+                               HDMI_SINK_CAPS              *pSinkCaps)
+{
     if (libHandle == NVHDMIPKT_INVALID_HANDLE)
     {
         return NVHDMIPKT_LIBRARY_INIT_FAIL;
@@ -402,9 +424,13 @@ NvHdmi_AssessLinkCapabilities(NvHdmiPkt_Handle             libHandle,
                                               subDevice,
                                               displayId,
                                               pSinkEdid,
+                                              bPerformLinkTrainingToAssess,
+                                              bIsDisplayActive,
+                                              currFRLRate,
                                               pSrcCaps,
                                               pSinkCaps);
 }
+
 /*
  * NvHdmi_QueryFRLConfig
  */
@@ -686,8 +712,9 @@ NvHdmiPkt_InitializeLibrary(NvU32                              const hwClass,
     pClass->callback.checkTimeout    = pCallbacks->checkTimeout;
 #endif
 
-#if defined (DEBUG)
     pClass->callback.print           = pCallbacks->print;
+
+#if defined (DEBUG)
     pClass->callback.assert          = pCallbacks->assert;
 #endif
 

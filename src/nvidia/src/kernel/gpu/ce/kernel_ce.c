@@ -24,6 +24,7 @@
 #include "core/locks.h"
 #include "gpu/ce/kernel_ce.h"
 #include "gpu/ce/kernel_ce_private.h"
+#include "gpu/bif/kernel_bif.h"
 #include "gpu/eng_desc.h"
 #include "gpu/mem_mgr/ce_utils.h"
 #include "gpu_mgr/gpu_mgr.h"
@@ -996,6 +997,25 @@ kceGetPceConfigForLceType_IMPL
     NV2080_CTRL_INTERNAL_CE_GET_PCE_CONFIG_FOR_LCE_TYPE_PARAMS pceConfigParams;
     portMemSet(&pceConfigParams, 0, sizeof(pceConfigParams));
     pceConfigParams.lceType = lceType;
+
+    if (lceType == NV2080_CTRL_CE_LCE_TYPE_PCIE_RD ||
+        lceType == NV2080_CTRL_CE_LCE_TYPE_PCIE_WR)
+    {
+        KernelBif *pKernelBif = GPU_GET_KERNEL_BIF(pGpu);
+
+        NV2080_CTRL_BUS_INFO busInfo = {0};
+        busInfo.index = NV2080_CTRL_BUS_INFO_INDEX_PCIE_ROOT_LINK_CAPS;
+        busInfo.data  = 0;
+
+        if (kbifControlGetPCIEInfo(pGpu, pKernelBif, &busInfo) == NV_OK)
+        {
+            pceConfigParams.metadataForLceType = ceEncodeLceTypeMetadataForPcie(pGpu, busInfo.data);
+        }
+        else
+        {
+            pceConfigParams.metadataForLceType = UNKNOWN_PCIE_GEN_SPEED;
+        }
+    }
 
     NV_ASSERT_OK_OR_RETURN(pRmApi->Control(pRmApi,
                                            pGpu->hInternalClient,

@@ -4856,6 +4856,22 @@ compile_test() {
             compile_check_conftest "$CODE" "NV_DRM_CONNECTOR_HELPER_FUNCS_MODE_VALID_HAS_CONST_MODE_ARG" "" "types"
         ;;
 
+        memory_device_coherent_present)
+            #
+            # Determine if MEMORY_DEVICE_COHERENT support is present or not
+            #
+            # Added by commit f25cbb7a95a2 ("mm: add zone device coherent type
+            # memory support") in v6.0.
+            #
+            CODE="
+            #include <linux/mm.h>
+            int memory_device_coherent = MEMORY_DEVICE_COHERENT;
+            "
+
+            compile_check_conftest "$CODE" "NV_MEMORY_DEVICE_COHERENT_PRESENT" "" "types"
+        ;;
+
+
         # When adding a new conftest entry, please use the correct format for
         # specifying the relevant upstream Linux kernel commit.  Please
         # avoid specifying -rc kernels, and only use SHAs that actually exist

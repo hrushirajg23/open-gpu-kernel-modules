@@ -976,7 +976,6 @@ NV_STATUS rm_is_vgpu_supported_device(
         for (i = 0; i < NV_ARRAY_ELEMENTS(sVgpuUsmTypes); i++)
         {
             if (pOsGpuInfo->pci_info.device_id == sVgpuUsmTypes[i].ulDevID &&
-                    pOsGpuInfo->subsystem_vendor == sVgpuUsmTypes[i].ulSubSystemVendorID &&
                     pOsGpuInfo->subsystem_id == sVgpuUsmTypes[i].ulSubID)
             {
                 return NV_OK;

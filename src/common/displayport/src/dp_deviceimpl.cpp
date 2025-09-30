@@ -3333,7 +3333,7 @@ bool DeviceImpl::setModeList(DisplayPort::DpModesetParams *modeList, unsigned nu
         connector->endCompoundQuery();
     }
 
-    DP_PRINTF(DP_INFO, "Computed Max mode BW: %d Mbps", maxModeBwRequired / (1000 * 1000));
+    DP_PRINTF(DP_INFO, "Computed Max mode BW: %" NvU64_fmtu " Mbps", maxModeBwRequired / (1000 * 1000));
 
     connector->updateDpTunnelBwAllocation();
 

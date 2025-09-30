@@ -178,12 +178,29 @@ typedef struct VASINFO_MAXWELL
     VA_MANAGEMENT management; // Level of management.
 } VASINFO_MAXWELL, *PVASINFO_MAXWELL;
 
+static NvBool isPageSizeCompatibleWithVA(NvU64 va_addr, NvU64 fb_addr, NvU64 pageSize)
+{
+    NvU64 pageOffset = fb_addr & (pageSize - 1);
+    NvU64 vaLo = RM_ALIGN_DOWN(va_addr, pageSize);
+    if ((va_addr - vaLo) != 0 &&
+        (va_addr - vaLo) != pageOffset)
+    {
+        return NV_FALSE;
+    }
+    else 
+    {
+        return NV_TRUE;
+    }
+}
+
 static NV_STATUS _dmaGetMaxVAPageSize
 (
     NvU64 vaAddr,
     VirtualMemory *pVirtualMemory,
     NvU64 physStartAddr,
     NvU64 physSize,
+    NvU64 memDescribedStartAddr,
+    NvU64 memDescribedSize,
     NvU64 *pVaMaxPageSize,
     NvU64 vaspaceBigPageSize
 )
@@ -195,14 +212,23 @@ static NV_STATUS _dmaGetMaxVAPageSize
     NvU64 physOffset;
     NvU64 alignedVA;
     NvBool bFoundPageSize = NV_FALSE;
+    NvU64 pageSizes[] = { RM_PAGE_SIZE_2M, vaspaceBigPageSize, RM_PAGE_SIZE };
+    NvU32 i;
 
-    if (pVirtualMemory == NULL)
+    if (pVirtualMemory != NULL)
     {
-        return NV_ERR_INVALID_ARGUMENT;
+        virtmemGetAddressAndSize(pVirtualMemory, &targetSpaceBase, &targetSpaceLength);
+        targetSpaceLimit = targetSpaceBase + targetSpaceLength - 1;
+    }
+    else
+    {
+        targetSpaceBase = 0;
+        targetSpaceLength = NV_U64_MAX;
+        targetSpaceLimit = NV_U64_MAX;
     }
 
-    virtmemGetAddressAndSize(pVirtualMemory, &targetSpaceBase, &targetSpaceLength);
-    targetSpaceLimit = targetSpaceBase + targetSpaceLength - 1;
+    NV_PRINTF(LEVEL_SILENT, "targetSpaceBase: 0x%llx, targetSpaceLength: 0x%llx, targetSpaceLimit: 0x%llx\n", targetSpaceBase, targetSpaceLength, targetSpaceLimit);
+    NV_PRINTF(LEVEL_SILENT, "memDescribedStartAddr: 0x%llx, memDescribedSize: 0x%llx\n", memDescribedStartAddr, memDescribedSize);
 
     //
     // Check VA and PA compatibility with a specific page size. 
@@ -214,42 +240,20 @@ static NV_STATUS _dmaGetMaxVAPageSize
     // Passing both checks ensures that the VA surface is compatible for mapping the surface
     // at the selected (and smaller) page size(s).
     //
-    if (!bFoundPageSize)
+    for (i = 0; i < NV_ARRAY_ELEMENTS(pageSizes); i++)
     {
-        alignedVA = NV_ALIGN_DOWN64(vaAddr, RM_PAGE_SIZE_2M);
-        physOffset = physStartAddr & GET_PAGE_MASK(RM_PAGE_SIZE_2M);
-
-        if ((alignedVA >= targetSpaceBase) &&            
-            (NV_ALIGN_UP64(alignedVA + physOffset + physSize, RM_PAGE_SIZE_2M) - 1) <= targetSpaceLimit)
-        {
-            vaMaxPageSize = RM_PAGE_SIZE_2M;
-            bFoundPageSize = NV_TRUE;
-        }
-    }
-
-    if (!bFoundPageSize)
-    {
-        alignedVA = NV_ALIGN_DOWN64(vaAddr, vaspaceBigPageSize);
-        physOffset = physStartAddr & GET_PAGE_MASK(vaspaceBigPageSize);
+        NvU64 pageSize = pageSizes[i];
+        alignedVA = NV_ALIGN_DOWN64(vaAddr, pageSize);
+        physOffset = physStartAddr & GET_PAGE_MASK(pageSize);
 
         if ((alignedVA >= targetSpaceBase) &&
-            (NV_ALIGN_UP64(alignedVA + physOffset + physSize, vaspaceBigPageSize) - 1) <= targetSpaceLimit)
+            (NV_ALIGN_UP64(alignedVA + physOffset + physSize, pageSize) - 1) <= targetSpaceLimit &&
+            (NV_ALIGN_UP64(physOffset + physSize, pageSize)) <= memDescribedSize &&
+            ((physStartAddr - physOffset) >= memDescribedStartAddr))
         {
-            vaMaxPageSize = vaspaceBigPageSize;
+            vaMaxPageSize = pageSize;
             bFoundPageSize = NV_TRUE;
-        }
-    }
-
-    if (!bFoundPageSize)
-    {
-        alignedVA = NV_ALIGN_DOWN64(vaAddr, RM_PAGE_SIZE);
-        physOffset = physStartAddr & GET_PAGE_MASK(RM_PAGE_SIZE);
-
-        if ((alignedVA >= targetSpaceBase) &&
-            (NV_ALIGN_UP64(alignedVA + physOffset + physSize, RM_PAGE_SIZE) - 1) <= targetSpaceLimit)
-        {
-            vaMaxPageSize = RM_PAGE_SIZE;
-            bFoundPageSize = NV_TRUE;
+            break;
         }
     }
 
@@ -531,7 +535,7 @@ dmaAllocMapping_GM107
     {
         case NVOS46_FLAGS_PAGE_SIZE_DEFAULT:
         case NVOS46_FLAGS_PAGE_SIZE_BOTH:
-            if (pMemoryManager->bSysmemPageSizeDefaultAllowLargePages)
+            if (GPU_GET_MEMORY_MANAGER(pGpu)->bSysmemPageSizeDefaultAllowLargePages)
             {
                 //
                 // On Fixed offset allocation, make sure that the least amount of VA is allocated
@@ -583,6 +587,8 @@ dmaAllocMapping_GM107
                         NV_ASSERT_OK_OR_GOTO(status, _dmaGetMaxVAPageSize(*pVaddr, pCliMapInfo->pVirtualMemory,
                             memdescGetPhysAddr(pLocals->pTempMemDesc, addressTranslation, 0),
                             memdescGetSize(pLocals->pTempMemDesc),
+                            memdescGetPteArray(pLocals->pTempMemDesc, addressTranslation)[0],
+                            pLocals->pTempMemDesc->ActualSize,
                             &vaMaxPageSize,
                             // TODO: Remove once Maxwell is deprecated.
                             pLocals->vaspaceBigPageSize),
@@ -596,18 +602,52 @@ dmaAllocMapping_GM107
                     }
                     else
                     {
+                        NvU64 vaMaxPageSize = 0;
+
                         //
                         // If the mapping call creates the VA surface, it has full control over the allocated VA range.
                         // Optimize VA surface to match the physical page size.
                         //
                         NV_PRINTF(LEVEL_SILENT, "Choosing default map pagesize based on the map call allocating VA for the mapping.\n");
-                        pLocals->pageSize = memdescGetPageSize(pLocals->pTempMemDesc, addressTranslation);
+    
+                        // TODO: Fix me - the submemdesc creation code is broken as it inherits the parent page size. submemdescs < parent page size will fail mapping.
+                        NV_ASSERT_OK_OR_GOTO(status, _dmaGetMaxVAPageSize(*pVaddr, NULL,
+                            memdescGetPhysAddr(pLocals->pTempMemDesc, addressTranslation, 0),
+                            memdescGetSize(pLocals->pTempMemDesc),
+                            memdescGetPteArray(pLocals->pTempMemDesc, addressTranslation)[0],
+                            pLocals->pTempMemDesc->ActualSize,
+                            &vaMaxPageSize,
+                            // TODO: Remove once Maxwell is deprecated.
+                            pLocals->vaspaceBigPageSize),
+                            cleanup);
+    
+                        //
+                        // The output of _dmaGetMaxVAPageSize guarantees tha the VA surface
+                        // is compatible with all page sizes <= vaMaxPageSize.
+                        //
+                        pLocals->pageSize = NV_MIN(vaMaxPageSize, pLocals->physPageSize);
+
                     }
                 }
             }
             else
             {
-                pLocals->pageSize = pLocals->physPageSize;
+                pLocals->pageSize = memdescGetPageSize(pLocals->pTempMemDesc, addressTranslation);
+
+                NvBool is_page_size_compatible = isPageSizeCompatibleWithVA(*pVaddr, 
+                    memdescGetPhysAddr(pLocals->pTempMemDesc, addressTranslation, 0), pLocals->pageSize);
+
+                if (!is_page_size_compatible) 
+                {
+                    if (!pLocals->bAllocVASpace && pCliMapInfo != NULL)
+                    {
+                        MEMORY_DESCRIPTOR *pMemDescVA;
+                        memGetMemoryMappingDescriptor(staticCast(pCliMapInfo->pVirtualMemory, Memory), &pMemDescVA);
+                        pLocals->pageSize = NV_MIN(memdescGetPageSize(pMemDescVA, AT_GPU_VA), pLocals->physPageSize);
+                        NV_ASSERT_OR_GOTO(pLocals->pageSize != 0, cleanup);
+                        NV_PRINTF(LEVEL_INFO, "Use preallocated VA's page size(0x%llx)\n", pLocals->pageSize);
+                    }
+                }
             }
 
             NV_ASSERT_OR_GOTO(pLocals->pageSize != 0, cleanup);

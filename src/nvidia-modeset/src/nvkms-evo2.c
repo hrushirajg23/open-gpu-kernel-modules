@@ -4098,6 +4098,7 @@ NVEvoHAL nvEvo97 = {
         FALSE,                                    /* supportsDPAudio192KHz */
         FALSE,                                    /* supportsInputColorSpace */
         FALSE,                                    /* supportsInputColorRange */
+        FALSE,                                    /* supportsYCbCr422OverHDMIFRL */
         NV_EVO2_SUPPORTED_DITHERING_MODES,        /* supportedDitheringModes */
         sizeof(NV5070_CTRL_CMD_IS_MODE_POSSIBLE_PARAMS), /* impStructSize */
         NV_EVO_SCALER_1TAP,                       /* minScalerTaps */
@@ -4196,6 +4197,7 @@ NVEvoHAL nvEvo94 = {
         FALSE,                                    /* supportsDPAudio192KHz */
         FALSE,                                    /* supportsInputColorSpace */
         FALSE,                                    /* supportsInputColorRange */
+        FALSE,                                    /* supportsYCbCr422OverHDMIFRL */
         NV_EVO2_SUPPORTED_DITHERING_MODES,        /* supportedDitheringModes */
         sizeof(NV5070_CTRL_CMD_IS_MODE_POSSIBLE_PARAMS), /* impStructSize */
         NV_EVO_SCALER_1TAP,                       /* minScalerTaps */

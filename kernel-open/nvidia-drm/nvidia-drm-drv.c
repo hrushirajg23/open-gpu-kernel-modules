@@ -691,7 +691,16 @@ static int nv_drm_dev_load(struct drm_device *dev)
     pDevice = nvKms->allocateDevice(&allocateDeviceParams);
 
     if (pDevice == NULL) {
-        NV_DRM_DEV_LOG_ERR(nv_dev, "Failed to allocate NvKmsKapiDevice");
+        if (nv_dev->gpu_info.needs_numa_setup) {
+            /*
+             * RM init from a kernel-mode driver may fail on GPUs that require
+             * NUMA setup. Just notify about that specifically rather than
+             * producing a scary-looking error.
+             */
+            NV_DRM_DEV_LOG_INFO(nv_dev, "NUMA was not set up yet; ignoring this device");
+        } else {
+            NV_DRM_DEV_LOG_ERR(nv_dev, "Failed to allocate NvKmsKapiDevice");
+        }
         return -ENODEV;
     }
 
@@ -787,6 +796,7 @@ static int nv_drm_dev_load(struct drm_device *dev)
         }
 #endif
         nvKms->freeDevice(nv_dev->pDevice);
+        NV_DRM_DEV_LOG_ERR(nv_dev, "Failed to create DRM properties");
         return -ENODEV;
     }
 
@@ -1994,7 +2004,6 @@ void nv_drm_register_drm_device(const struct NvKmsKapiGpuInfo *gpu_info)
 
     /* Load DRM device before registering it */
     if (nv_drm_dev_load(dev) != 0) {
-        NV_DRM_DEV_LOG_ERR(nv_dev, "Failed to load device");
         goto failed_drm_load;
     }
 

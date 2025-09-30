@@ -269,6 +269,27 @@ kfspStateDestroy_IMPL
 
 }
 
+/*
+ * @brief GpuWaitConditionFunc for FSP ready
+ *
+ * @param[in] pGpu          GPU object pointer
+ * @param[in] pCondData     KernelFsp object pointer
+ *
+ * @returns   NvBool        NV_TRUE if command and message fsp
+ *                          queues are empty
+ */
+static NvBool
+_kfspWaitForCanSend
+(
+    OBJGPU *pGpu,
+    void   *pCondData
+)
+{
+    KernelFsp *pKernelFsp = (KernelFsp*) pCondData;
+
+    return kfspCanSendPacket_HAL(pGpu, pKernelFsp);
+}
+
 /*!
  * @brief Wait until RM can send to FSP
  *
@@ -290,40 +311,11 @@ kfspPollForCanSend_IMPL
     gpuSetTimeout(pGpu, GPU_TIMEOUT_DEFAULT, &timeout,
         GPU_TIMEOUT_FLAGS_OSTIMER);
 
-    while (!kfspCanSendPacket_HAL(pGpu, pKernelFsp))
+    status = gpuTimeoutCondWait(pGpu, _kfspWaitForCanSend, pKernelFsp, &timeout);
+    if (status != NV_OK)
     {
-        //
-        // For now we assume that any response from FSP before RM message
-        // send is complete indicates an error and we should abort.
-        //
-        // Ongoing dicussion on usefullness of this check. Bug to be filed.
-        //
-        if (kfspIsResponseAvailable_HAL(pGpu, pKernelFsp))
-        {
-            kfspReadMessage(pGpu, pKernelFsp, NULL, 0);
-            NV_PRINTF(LEVEL_ERROR,
-                "Received error message from FSP while waiting to send.\n");
-            status = NV_ERR_GENERIC;
-            break;
-        }
-
-        osSpinLoop();
-
-        status = gpuCheckTimeout(pGpu, &timeout);
-        if (status != NV_OK)
-        {
-            if ((status == NV_ERR_TIMEOUT) &&
-                kfspCanSendPacket_HAL(pGpu, pKernelFsp))
-            {
-                status = NV_OK;
-            }
-            else
-            {
-                NV_PRINTF(LEVEL_ERROR,
-                    "Timed out waiting for FSP command queue to be empty.\n");
-            }
-            break;
-        }
+        NV_PRINTF(LEVEL_ERROR,
+            "Timed out waiting for FSP queues to be empty.\n");
     }
 
     return status;

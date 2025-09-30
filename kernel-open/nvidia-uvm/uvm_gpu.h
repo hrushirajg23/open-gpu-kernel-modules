@@ -711,21 +711,6 @@ struct uvm_gpu_struct
             int node_id;
         } numa;
 
-        // Coherent Driver-based Memory Management (CDMM) is a mode that allows
-        // coherent GPU memory to be managed by the driver and not the OS. This
-        // is done by the driver not onlining the memory as NUMA nodes. Having
-        // the field provides the most flexibility and is sync with the numa
-        // properties above. CDMM as a property applies to the entire system.
-        bool cdmm_enabled;
-
-        // Physical address of the start of statically mapped fb memory in BAR1
-        NvU64 static_bar1_start;
-
-        // Size of statically mapped fb memory in BAR1.
-        NvU64 static_bar1_size;
-
-        // Whether or not RM has iomapped the region write combined.
-        NvBool static_bar1_write_combined;
     } mem_info;
 
     struct
@@ -941,9 +926,6 @@ struct uvm_gpu_struct
     // Force pushbuffer's GPU VA to be >= 1TB; used only for testing purposes.
     bool uvm_test_force_upper_pushbuffer_segment;
 
-    // Have we initialised device p2p pages.
-    bool device_p2p_initialised;
-
     // Used to protect allocation of p2p_mem and assignment of the page
     // zone_device_data fields.
     uvm_mutex_t device_p2p_lock;
@@ -1014,9 +996,27 @@ struct uvm_parent_gpu_struct
     // Total amount of physical memory available on the parent GPU.
     NvU64 max_allocatable_address;
 
-#if UVM_IS_CONFIG_HMM()
+#if UVM_IS_CONFIG_HMM() || defined(NV_MEMORY_DEVICE_COHERENT_PRESENT)
     uvm_pmm_gpu_devmem_t *devmem;
 #endif
+
+    // Physical address of the start of statically mapped fb memory in BAR1
+    NvU64 static_bar1_start;
+
+    // Size of statically mapped fb memory in BAR1.
+    NvU64 static_bar1_size;
+
+    // Whether or not RM has iomapped the region write combined.
+    NvBool static_bar1_write_combined;
+
+    // Have we initialised device p2p pages.
+    bool device_p2p_initialised;
+
+    // Coherent Driver-based Memory Management (CDMM) is a mode that allows
+    // coherent GPU memory to be managed by the driver and not the OS. This
+    // is done by the driver not onlining the memory as NUMA nodes. CDMM as a
+    // property applies to the entire system.
+    bool cdmm_enabled;
 
     // The physical address range addressable by the GPU
     //
@@ -1867,6 +1867,6 @@ typedef enum
 } uvm_gpu_buffer_flush_mode_t;
 
 // PCIe BAR containing static framebuffer memory mappings for PCIe P2P
-int uvm_device_p2p_static_bar(uvm_gpu_t *gpu);
+int uvm_device_p2p_static_bar(uvm_parent_gpu_t *gpu);
 
 #endif // __UVM_GPU_H__

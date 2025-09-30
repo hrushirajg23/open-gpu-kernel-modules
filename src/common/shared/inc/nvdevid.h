@@ -654,6 +654,7 @@ enum {
 ,     CS_AMD_RPH
 ,     CS_INTEL_B660
 ,     CS_AMPERE_AMPEREONE192
+,     CS_NVIDIA_T254
 ,     CS_MAX_PCIE
 };
 

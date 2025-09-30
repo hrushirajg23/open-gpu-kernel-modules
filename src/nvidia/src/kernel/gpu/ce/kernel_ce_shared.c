@@ -364,3 +364,51 @@ void ceResumeCeUtilsScheduling(OBJGPU *pGpu)
         }
     }
 }
+
+NvU32
+ceEncodeLceTypeMetadataForPcie
+(
+    OBJGPU *pGpu,
+    NvU32   pcieGenSpeed
+)
+{
+    switch (DRF_VAL(2080, _CTRL_BUS, _INFO_PCIE_LINK_CAP_MAX_SPEED, pcieGenSpeed))
+    {
+        case NV2080_CTRL_BUS_INFO_PCIE_LINK_CAP_MAX_SPEED_2500MBPS:
+        {
+            return NV2080_CTRL_BUS_INFO_PCIE_LINK_CAP_GEN_GEN1;
+        }
+        case NV2080_CTRL_BUS_INFO_PCIE_LINK_CAP_MAX_SPEED_5000MBPS:
+        {
+            return NV2080_CTRL_BUS_INFO_PCIE_LINK_CAP_GEN_GEN2;
+        }
+        case NV2080_CTRL_BUS_INFO_PCIE_LINK_CAP_MAX_SPEED_8000MBPS:
+        {
+            return NV2080_CTRL_BUS_INFO_PCIE_LINK_CAP_GEN_GEN3;
+        }
+        case NV2080_CTRL_BUS_INFO_PCIE_LINK_CAP_MAX_SPEED_16000MBPS:
+        {
+            return NV2080_CTRL_BUS_INFO_PCIE_LINK_CAP_GEN_GEN4;
+        }
+        case NV2080_CTRL_BUS_INFO_PCIE_LINK_CAP_MAX_SPEED_32000MBPS:
+        {
+            return NV2080_CTRL_BUS_INFO_PCIE_LINK_CAP_GEN_GEN5;
+        }
+        case NV2080_CTRL_BUS_INFO_PCIE_LINK_CAP_MAX_SPEED_64000MBPS:
+        {
+            return NV2080_CTRL_BUS_INFO_PCIE_LINK_CAP_GEN_GEN6;
+        }
+        default:                
+        {
+            NV_PRINTF(LEVEL_ERROR, "ceEncodeLceTypeMetadataForPcie unknown\n");
+            return UNKNOWN_PCIE_GEN_SPEED;
+        }
+    }
+}
+
+NvU32
+ceDecodePcieGenSpeedFromLceTypeMetadata(OBJGPU *pGpu, NvU32 lceTypeMetadata)
+{
+    // Since the metadata just has PCIe gen speed now, just return it as is.
+    return lceTypeMetadata;
+}

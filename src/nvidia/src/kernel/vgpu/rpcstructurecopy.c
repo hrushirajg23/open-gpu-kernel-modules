@@ -2826,9 +2826,6 @@ NV_STATUS deserialize_NV0080_CTRL_MSENC_GET_CAPS_V2_PARAMS_v25_00(
         }
 
         pParams_v25_00 = (void*)(buffer + *offset);
-        NV_ASSERT_OR_RETURN(NV0080_CTRL_MSENC_CAPS_TBL_SIZE_V25_00 <=
-                            NV0080_CTRL_MSENC_CAPS_TBL_SIZE,
-                            NV_ERR_INSUFFICIENT_RESOURCES);
 
         pParams->instanceId = pParams_v25_00->instanceId;
         portMemCopy(pParams->capsTbl, sizeof(pParams->capsTbl),

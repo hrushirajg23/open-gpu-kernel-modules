@@ -526,6 +526,7 @@ vgpuconfigapiCtrlCmdVgpuConfigGetVgpuTypeInfo_IMPL
     pParams->vgpuTypeInfo.multiVgpuExclusive = vgpuTypeInfo->multiVgpuExclusive;
     pParams->vgpuTypeInfo.frlEnable          = vgpuTypeInfo->frlEnable;
     pParams->vgpuTypeInfo.multiVgpuSupported = vgpuTypeInfo->multiVgpuSupported;
+    pParams->vgpuTypeInfo.vgpuSsvid          = vgpuMgrGetVgpuSsvid(pGpu);
 
     /* Represents vGPU type level support for heterogeneous timeslice profiles */
     pParams->vgpuTypeInfo.exclusiveType      = !kvgpumgrIsHeterogeneousVgpuTypeSupported();
@@ -911,6 +912,14 @@ vgpuconfigapiCtrlCmdVgpuConfigSetCapability_IMPL
         {
             if (pGpu->getProperty(pGpu, PDB_PROP_GPU_MIG_TIMESLICING_SUPPORTED))
             {
+                NV2080_CTRL_VGPU_MGR_INTERNAL_SET_VGPU_MIG_TIMESLICE_MODE_PARAMS params = {0};
+                RM_API *pRmApi = GPU_GET_PHYSICAL_RMAPI(pGpu);
+
+                params.bMigTimeslicingModeEnabled = pSetCapabilityParams->state;
+                NV_CHECK_OK_OR_RETURN(LEVEL_ERROR,
+                    pRmApi->Control(pRmApi, pGpu->hInternalClient, pGpu->hInternalSubdevice,
+                                    NV2080_CTRL_CMD_VGPU_MGR_INTERNAL_SET_VGPU_MIG_TIMESLICE_MODE,
+                                    &params, sizeof(params)));
                 pPhysGpuInfo->migTimeslicingModeEnabled = pSetCapabilityParams->state;
             }
             else

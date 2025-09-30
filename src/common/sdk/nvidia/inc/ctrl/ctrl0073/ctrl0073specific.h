@@ -1351,6 +1351,10 @@ typedef struct NV0073_CTRL_SPECIFIC_SET_MONITOR_POWER_PARAMS {
 *   bLtSkipped
 *     The flag returned indicating whether link training is skipped or not.
 *     TRUE if link training is skipped due to the link config is not changed.
+*   bLinkAssessmentOnly
+*     The flag as input to this command. It indicates that the client is doing
+*     link training only for the link assessment, no FRL video transmission is
+*     intended.
 *
 * Possible status values returned include:
 * NV_OK -
@@ -1374,16 +1378,51 @@ typedef struct NV0073_CTRL_SPECIFIC_SET_HDMI_FRL_LINK_CONFIG_PARAMS {
     NvU32  data;
     NvBool bFakeLt;
     NvBool bLtSkipped;
+    NvBool bLinkAssessmentOnly;
 } NV0073_CTRL_SPECIFIC_SET_HDMI_FRL_LINK_CONFIG_PARAMS;
 
 #define NV0073_CTRL_HDMI_FRL_DATA_SET_FRL_RATE                                           2:0
-#define NV0073_CTRL_HDMI_FRL_DATA_SET_FRL_RATE_NONE                (0x00000000U)
-#define NV0073_CTRL_HDMI_FRL_DATA_SET_FRL_RATE_3LANES_3G           (0x00000001U)
-#define NV0073_CTRL_HDMI_FRL_DATA_SET_FRL_RATE_3LANES_6G           (0x00000002U)
-#define NV0073_CTRL_HDMI_FRL_DATA_SET_FRL_RATE_4LANES_6G           (0x00000003U)
-#define NV0073_CTRL_HDMI_FRL_DATA_SET_FRL_RATE_4LANES_8G           (0x00000004U)
-#define NV0073_CTRL_HDMI_FRL_DATA_SET_FRL_RATE_4LANES_10G          (0x00000005U)
-#define NV0073_CTRL_HDMI_FRL_DATA_SET_FRL_RATE_4LANES_12G          (0x00000006U)
+#define NV0073_CTRL_HDMI_FRL_DATA_SET_FRL_RATE_NONE       (0x00000000U)
+#define NV0073_CTRL_HDMI_FRL_DATA_SET_FRL_RATE_3LANES_3G  (0x00000001U)
+#define NV0073_CTRL_HDMI_FRL_DATA_SET_FRL_RATE_3LANES_6G  (0x00000002U)
+#define NV0073_CTRL_HDMI_FRL_DATA_SET_FRL_RATE_4LANES_6G  (0x00000003U)
+#define NV0073_CTRL_HDMI_FRL_DATA_SET_FRL_RATE_4LANES_8G  (0x00000004U)
+#define NV0073_CTRL_HDMI_FRL_DATA_SET_FRL_RATE_4LANES_10G (0x00000005U)
+#define NV0073_CTRL_HDMI_FRL_DATA_SET_FRL_RATE_4LANES_12G (0x00000006U)
+
+/*
+* NV0073_CTRL_CMD_SPECIFIC_SET_HDMI_FRL_FLUSH_MODE
+*
+* This command is used to enable flush mode on given HDMI displayId in
+* preparation for FRL link training. The flush mode can be enabled only if HDMI
+* display is active and driven by FRL protocol. If display is not active then
+* this control command does nothing.
+*
+*   subDeviceInstance
+*     This parameter specifies the subdevice instance within the
+*     NV04_DISPLAY_COMMON parent device to which the operation should be
+*     directed.
+*   displayID
+*     This parameter specifies the displayID for the display output resource to
+*     configure.
+*   bEnable
+*     This parameter is an inputto this command.
+*
+* Possible status values returned include:
+* NV_OK
+* NV_ERR_INVALID_ARGUMENT
+*   If any argument is invalid for this control call, NV_ERR_INVALID_ARGUMENT
+*   status will be returned.
+*/
+#define NV0073_CTRL_CMD_SPECIFIC_SET_HDMI_FRL_FLUSH_MODE  (0x73029bU) /* finn: Evaluated from "(FINN_NV04_DISPLAY_COMMON_SPECIFIC_INTERFACE_ID << 8) | NV0073_CTRL_SPECIFIC_SET_HDMI_FRL_FLUSH_MODE_PARAMS_MESSAGE_ID" */
+
+#define NV0073_CTRL_SPECIFIC_SET_HDMI_FRL_FLUSH_MODE_PARAMS_MESSAGE_ID (0x9BU)
+
+typedef struct NV0073_CTRL_SPECIFIC_SET_HDMI_FRL_FLUSH_MODE_PARAMS {
+    NvU32  subDeviceInstance;
+    NvU32  displayId;
+    NvBool bEnable;
+} NV0073_CTRL_SPECIFIC_SET_HDMI_FRL_FLUSH_MODE_PARAMS;
 
 
 

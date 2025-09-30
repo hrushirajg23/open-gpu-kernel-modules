@@ -95,6 +95,10 @@ extern void CP_WRITE_CSSELR_REGISTER(NvU32 val);
 #define CP_MIDR_PRIMARY_PART_NUM_NEOVERSE_N2   0xd49
 #define CP_MIDR_PRIMARY_PART_NUM_AMPEREONE160  0xac3
 #define CP_MIDR_PRIMARY_PART_NUM_AMPEREONE192  0xac4
+// Performance Core
+#define CP_MIDR_PRIMARY_PART_NUM_NVIDIA_T254_P   0xd85
+// Efficiency Core
+#define CP_MIDR_PRIMARY_PART_NUM_NVIDIA_T254_E   0xd87
 
 // Cache Size Identification Register
 #define CP_CCSIDR                     "ccsidr_el1"

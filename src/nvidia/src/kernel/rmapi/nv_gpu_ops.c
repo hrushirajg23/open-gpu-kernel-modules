@@ -282,6 +282,7 @@ struct gpuDevice
     NvU32              accessCounterBufferClass;
     NvBool             isTccMode;
     NvBool             isWddmMode;
+    NvBool             isMigDevice;
     struct gpuSession  *session;
     gpuFbInfo          fbInfo;
     gpuInfo            info;
@@ -1045,7 +1046,7 @@ static NvU64 makeDeviceDescriptorKey(const struct gpuDevice *device)
     NvU64 key = device->deviceInstance;
     NvU64 swizzid = device->info.smcSwizzId;
 
-    if (device->info.smcEnabled)
+    if (device->isMigDevice)
         key |= (swizzid << 32);
 
     return key;
@@ -2181,6 +2182,7 @@ NV_STATUS nvGpuOpsDeviceCreate(struct gpuSession *session,
     device->deviceInstance = gpuIdInfoParams.deviceInstance;
     device->subdeviceInstance = gpuIdInfoParams.subdeviceInstance;
     device->gpuId = gpuIdInfoParams.gpuId;
+    device->isMigDevice = bCreateSmcPartition;
 
     portMemCopy(&device->info, sizeof(device->info), pGpuInfo, sizeof(*pGpuInfo));
 
@@ -7224,6 +7226,43 @@ static NV_STATUS getAtsInfo(OBJGPU *pGpu,
     return NV_OK;
 }
 
+static NV_STATUS getCdmmInfo(OBJGPU *pGpu,
+                             NvHandle hClient,
+                             NvHandle hSubDevice,
+                             gpuInfo *pGpuInfo)
+{
+    NvU32 coherentModeInfo;
+    NV2080_CTRL_GPU_GET_INFO_V2_PARAMS *gpuInfoParams;
+    RM_API *pRmApi = rmapiGetInterface(RMAPI_EXTERNAL_KERNEL);
+    NV_STATUS status;
+
+    gpuInfoParams = portMemAllocNonPaged(sizeof(*gpuInfoParams));
+    if (gpuInfoParams == NULL)
+        return NV_ERR_INSUFFICIENT_RESOURCES;
+
+    portMemSet(gpuInfoParams, 0, sizeof(*gpuInfoParams));
+    gpuInfoParams->gpuInfoListSize = 1;
+    gpuInfoParams->gpuInfoList[0].index =
+        NV2080_CTRL_GPU_INFO_INDEX_COHERENT_GPU_MEMORY_MODE;
+    status = pRmApi->Control(pRmApi,
+                             hClient,
+                             hSubDevice,
+                             NV2080_CTRL_CMD_GPU_GET_INFO_V2,
+                             gpuInfoParams,
+                             sizeof(*gpuInfoParams));
+    coherentModeInfo = gpuInfoParams->gpuInfoList[0].data;
+    portMemFree(gpuInfoParams);
+
+    if (status != NV_OK)
+        return status;
+
+    pGpuInfo->cdmmEnabled = (coherentModeInfo == NV2080_CTRL_GPU_INFO_INDEX_COHERENT_GPU_MEMORY_MODE_DRIVER);
+    NV_PRINTF(LEVEL_INFO, "CDMM Enabled: %d\n", pGpuInfo->cdmmEnabled);
+
+    return NV_OK;
+}
+
+
 static NV_STATUS getNonPasidAtsInfo(OBJGPU *pGpu,
                                   NvHandle hClient,
                                   NvHandle hSubDevice,
@@ -7598,6 +7637,10 @@ NV_STATUS nvGpuOpsGetGpuInfo(const NvProcessorUuid *pUuid,
     if (status != NV_OK)
         goto cleanup;
 
+    status = getCdmmInfo(pGpu, clientHandle, subDeviceHandle, pGpuInfo);
+    if (status != NV_OK)
+        goto cleanup;
+
 cleanup:
     if (isSubdeviceAllocated)
         pRmApi->Free(pRmApi, clientHandle, subDeviceHandle);
@@ -7936,7 +7979,7 @@ static NV_STATUS dupMemory(struct gpuDevice *device,
 {
     NV_STATUS status = NV_OK;
     nvGpuOpsLockSet acquiredLocks;
-    THREAD_STATE_NODE threadState;
+    THREAD_STATE_NODE *pThreadState;
     NvHandle  dupedMemHandle;
     Memory *pMemory =  NULL;
     PMEMORY_DESCRIPTOR pMemDesc = NULL;
@@ -7957,14 +8000,15 @@ static NV_STATUS dupMemory(struct gpuDevice *device,
 
     NV_ASSERT((flags == NV04_DUP_HANDLE_FLAGS_REJECT_KERNEL_DUP_PRIVILEGE) || (flags == NV04_DUP_HANDLE_FLAGS_NONE));
 
-    threadStateInit(&threadState, THREAD_STATE_FLAGS_NONE);
-
+    pThreadState = threadStateAlloc(THREAD_STATE_FLAGS_NONE);
+    if (!pThreadState)
+        return NV_ERR_NO_MEMORY;
     // RS-TODO use dual client locking
     status = _nvGpuOpsLocksAcquireAll(RMAPI_LOCK_FLAGS_NONE, device->session->handle,
         &pSessionClient, &acquiredLocks);
     if (status != NV_OK)
     {
-        threadStateFree(&threadState, THREAD_STATE_FLAGS_NONE);
+        threadStateFree(pThreadState, THREAD_STATE_FLAGS_NONE);
         return status;
     }
 
@@ -8006,15 +8050,23 @@ static NV_STATUS dupMemory(struct gpuDevice *device,
     }
 
     // For SYSMEM or indirect peer mappings
-    bIsIndirectPeer = gpumgrCheckIndirectPeer(pMappingGpu, pAdjustedMemDesc->pGpu);
+    // Deviceless memory (NV01_MEMORY_DEVICELESS) can have a NULL pGpu. Perform targeted
+    // null checks before IOMMU operations that require valid GPU contexts.
+    bIsIndirectPeer = (pAdjustedMemDesc->pGpu != NULL) ?
+                       gpumgrCheckIndirectPeer(pMappingGpu, pAdjustedMemDesc->pGpu) : NV_FALSE;
     if (bIsIndirectPeer ||
         memdescRequiresIommuMapping(pAdjustedMemDesc))
     {
+        if (NV_UNLIKELY(pAdjustedMemDesc->pGpu == NULL))
+        {
+            status = NV_ERR_INVALID_STATE;
+            goto freeGpaMemdesc;
+        }
         // For sysmem allocations, the dup done below is very shallow and in
         // particular doesn't create IOMMU mappings required for the mapped GPU
         // to access the memory. That's a problem if the mapped GPU is different
         // from the GPU that the allocation was created under. Add them
-        // explicitly here and remove them when the memory is freed in n
+        // explicitly here and remove them when the memory is freed in
         // nvGpuOpsFreeDupedHandle(). Notably memdescMapIommu() refcounts the
         // mappings so it's ok to call it if the mappings are already there.
         //
@@ -8098,7 +8150,7 @@ freeGpaMemdesc:
 
 done:
     _nvGpuOpsLocksRelease(&acquiredLocks);
-    threadStateFree(&threadState, THREAD_STATE_FLAGS_NONE);
+    threadStateFree(pThreadState, THREAD_STATE_FLAGS_NONE);
     return status;
 }
 

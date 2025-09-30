@@ -103,6 +103,11 @@
 // This regkey forces devID to be exposed to vendors via DPCD 0x309 for DSC-enabled SKUs.
 #define NV_DP_REGKEY_EXPOSE_DSC_DEVID_WAR                         "DP_DSC_DEVID_WAR"
 
+// This regkey ensures DPLib takes into account Displayport++ supports HDMI.
+#define NV_DP_REGKEY_HDMI_ON_DP_PLUS_PLUS                         "HDMI_ON_DP_PLUS_PLUS"
+
+#define NV_DP_REGKEY_IGNORE_CAPS_AND_FORCE_HIGHEST_LC             "DP_IGNORE_CAPS_AND_FORCE_HIGHEST_LC_WAR"
+
 //
 // Data Base used to store all the regkey values.
 // The actual data base is declared statically in dp_evoadapter.cpp.
@@ -146,6 +151,8 @@ struct DP_REGKEY_DATABASE
     bool  bEnable5147205Fix;
     bool  bForceHeadShutdown;
     bool  bEnableDevId;
+    bool  bHDMIOnDPPlusPlus;
+    bool  bIgnoreCapsAndForceHighestLc;
 };
 
 extern struct DP_REGKEY_DATABASE dpRegkeyDatabase;

@@ -1257,7 +1257,7 @@ static inline NvGpuSemaphore *Hs3dGetSemaphore(
     return (NvGpuSemaphore *) pNotifier;
 }
 
-#if NVKMS_PROCFS_ENABLE
+#if NVKMS_HEADSURFACE_STATS
 /*!
  * Get the semaphore index (e.g., to be passed into
  * nvPushGetNotifierGpuAddress()) for an (eye, slot) pair.
@@ -1358,7 +1358,7 @@ static void Hs3dStatisticsComputeFps(
     }
 }
 
-#endif /* NVKMS_PROCFS_ENABLE */
+#endif /* NVKMS_HEADSURFACE_STATS */
 
 /*!
  * Collect statistics on headSurface rendering.
@@ -1380,7 +1380,7 @@ static void Hs3dStatisticsBefore(
     const NvU8 eye,
     const NvU8 slot)
 {
-#if NVKMS_PROCFS_ENABLE
+#if NVKMS_HEADSURFACE_STATS
     NVHsChannelStatisticsOneEyeRec *pPerEye =
         &pHsChannel->statistics.perEye[eye][slot];
 
@@ -1438,7 +1438,7 @@ done:
         semIndex + NVKMS_HEADSURFACE_STATS_SEMAPHORE_BEFORE,
         pPerEye->nFrames);
 
-#endif /* NVKMS_PROCFS_ENABLE */
+#endif /* NVKMS_HEADSURFACE_STATS */
 }
 
 static void Hs3dStatisticsAfter(
@@ -1446,7 +1446,7 @@ static void Hs3dStatisticsAfter(
     const NvU8 eye,
     const NvU8 slot)
 {
-#if NVKMS_PROCFS_ENABLE
+#if NVKMS_HEADSURFACE_STATS
     NVHsChannelStatisticsOneEyeRec *pPerEye =
         &pHsChannel->statistics.perEye[eye][slot];
     const NvU8 semIndex = Hs3dGetStatisticsSemaphoreIndex(eye, slot);
@@ -1458,7 +1458,7 @@ static void Hs3dStatisticsAfter(
 
     pPerEye->nFrames++;
 
-#endif /* NVKMS_PROCFS_ENABLE */
+#endif /* NVKMS_HEADSURFACE_STATS */
 }
 
 /*!

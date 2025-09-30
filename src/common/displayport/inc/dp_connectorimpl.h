@@ -259,6 +259,12 @@ namespace DisplayPort
         // Flag to check if the system is UEFI.
         bool        bIsUefiSystem;
 
+        //
+        // Flag to ensure we take into account that
+        // Displayport++ supports HDMI as well.
+        //
+        bool        bHDMIOnDPPlusPlus;
+
         bool        bSkipResetLinkStateDuringPlug;
 
         // Flag to check if LT should be skipped.
@@ -341,6 +347,8 @@ namespace DisplayPort
         // 2561206.
         //
         NvU32       LT2FecLatencyMs;
+
+        bool        bIgnoreCapsAndForceHighestLc;
 
         // On eDP, do not cache the source OUI if it reads 0. See bug 4793112
         bool        bSkipZeroOuiCache;

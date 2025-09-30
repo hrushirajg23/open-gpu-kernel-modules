@@ -237,10 +237,11 @@ static inline NV_STATUS khfrpMailboxQueueMessage(struct KernelHFRP *pHfrp, NvU32
 #define khfrpMailboxQueueMessage(pHfrp, messageHeader, pPayloadArray, payloadSize, mailboxFlag) khfrpMailboxQueueMessage_IMPL(pHfrp, messageHeader, pPayloadArray, payloadSize, mailboxFlag)
 #endif // __nvoc_kernel_hfrp_h_disabled
 
-void khfrpServiceEvent_IMPL(struct KernelHFRP *pHfrp);
+NV_STATUS khfrpServiceEvent_IMPL(struct KernelHFRP *pHfrp);
 #ifdef __nvoc_kernel_hfrp_h_disabled
-static inline void khfrpServiceEvent(struct KernelHFRP *pHfrp) {
+static inline NV_STATUS khfrpServiceEvent(struct KernelHFRP *pHfrp) {
     NV_ASSERT_FAILED_PRECOMP("KernelHFRP was disabled!");
+    return NV_ERR_NOT_SUPPORTED;
 }
 #else // __nvoc_kernel_hfrp_h_disabled
 #define khfrpServiceEvent(pHfrp) khfrpServiceEvent_IMPL(pHfrp)
@@ -295,14 +296,14 @@ static inline NV_STATUS khfrpPollOnIrqRm(struct KernelHFRP *pHfrp, NvU32 irqRegA
 #define khfrpPollOnIrqRm(pHfrp, irqRegAddr, bitIndex, bData) khfrpPollOnIrqRm_IMPL(pHfrp, irqRegAddr, bitIndex, bData)
 #endif // __nvoc_kernel_hfrp_h_disabled
 
-NV_STATUS khfrpPostCommandBlocking_IMPL(struct KernelHFRP *pHfrp, NvU16 commandIndex, void *pCommandPayload, NvU32 commandPayloadSize, NvU16 *pResponseStatus, void *pResponsePayload, NvU32 *pResponsePayloadSize, NV_STATUS *pStatus);
+NV_STATUS khfrpPostCommandBlocking_IMPL(struct KernelHFRP *pHfrp, NvU16 commandIndex, void *pCommandPayload, NvU32 commandPayloadSize, NvU16 *pResponseStatus, void *pResponsePayload, NvU32 *pResponsePayloadSize);
 #ifdef __nvoc_kernel_hfrp_h_disabled
-static inline NV_STATUS khfrpPostCommandBlocking(struct KernelHFRP *pHfrp, NvU16 commandIndex, void *pCommandPayload, NvU32 commandPayloadSize, NvU16 *pResponseStatus, void *pResponsePayload, NvU32 *pResponsePayloadSize, NV_STATUS *pStatus) {
+static inline NV_STATUS khfrpPostCommandBlocking(struct KernelHFRP *pHfrp, NvU16 commandIndex, void *pCommandPayload, NvU32 commandPayloadSize, NvU16 *pResponseStatus, void *pResponsePayload, NvU32 *pResponsePayloadSize) {
     NV_ASSERT_FAILED_PRECOMP("KernelHFRP was disabled!");
     return NV_ERR_NOT_SUPPORTED;
 }
 #else // __nvoc_kernel_hfrp_h_disabled
-#define khfrpPostCommandBlocking(pHfrp, commandIndex, pCommandPayload, commandPayloadSize, pResponseStatus, pResponsePayload, pResponsePayloadSize, pStatus) khfrpPostCommandBlocking_IMPL(pHfrp, commandIndex, pCommandPayload, commandPayloadSize, pResponseStatus, pResponsePayload, pResponsePayloadSize, pStatus)
+#define khfrpPostCommandBlocking(pHfrp, commandIndex, pCommandPayload, commandPayloadSize, pResponseStatus, pResponsePayload, pResponsePayloadSize) khfrpPostCommandBlocking_IMPL(pHfrp, commandIndex, pCommandPayload, commandPayloadSize, pResponseStatus, pResponsePayload, pResponsePayloadSize)
 #endif // __nvoc_kernel_hfrp_h_disabled
 
 NV_STATUS khfrpInterfaceReset_IMPL(struct KernelHFRP *pHfrp);

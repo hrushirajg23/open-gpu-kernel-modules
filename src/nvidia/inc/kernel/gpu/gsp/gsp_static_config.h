@@ -210,6 +210,7 @@ typedef struct GspSystemInfo
     NvU64 sysTimerOffsetNs;
     GSP_VF_INFO gspVFInfo;
     NvBool bIsPrimary;
+    NvBool bIsUnixHdmiFrlComplianceEnabled;
     NvBool isGridBuild;
     GSP_PCIE_CONFIG_REG pcieConfigReg;
     NvU32 gridBuildCsp;

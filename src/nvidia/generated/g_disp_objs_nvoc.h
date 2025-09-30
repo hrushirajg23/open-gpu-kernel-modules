@@ -2568,6 +2568,16 @@ static inline NV_STATUS dispcmnCtrlCmdSpecificSetHdmiFrlLinkConfig(struct DispCo
 #define dispcmnCtrlCmdSpecificSetHdmiFrlLinkConfig(pDispCommon, pParams) dispcmnCtrlCmdSpecificSetHdmiFrlLinkConfig_IMPL(pDispCommon, pParams)
 #endif // __nvoc_disp_objs_h_disabled
 
+NV_STATUS dispcmnCtrlCmdSpecificSetHdmiFrlFlushMode_IMPL(struct DispCommon *pDispCommon, NV0073_CTRL_SPECIFIC_SET_HDMI_FRL_FLUSH_MODE_PARAMS *pParams);
+#ifdef __nvoc_disp_objs_h_disabled
+static inline NV_STATUS dispcmnCtrlCmdSpecificSetHdmiFrlFlushMode(struct DispCommon *pDispCommon, NV0073_CTRL_SPECIFIC_SET_HDMI_FRL_FLUSH_MODE_PARAMS *pParams) {
+    NV_ASSERT_FAILED_PRECOMP("DispCommon was disabled!");
+    return NV_ERR_NOT_SUPPORTED;
+}
+#else // __nvoc_disp_objs_h_disabled
+#define dispcmnCtrlCmdSpecificSetHdmiFrlFlushMode(pDispCommon, pParams) dispcmnCtrlCmdSpecificSetHdmiFrlFlushMode_IMPL(pDispCommon, pParams)
+#endif // __nvoc_disp_objs_h_disabled
+
 NV_STATUS dispcmnCtrlCmdSpecificApplyEdidOverrideV2_IMPL(struct DispCommon *pDispCommon, NV0073_CTRL_SPECIFIC_APPLY_EDID_OVERRIDE_V2_PARAMS *pEdidOverrideParams);
 #ifdef __nvoc_disp_objs_h_disabled
 static inline NV_STATUS dispcmnCtrlCmdSpecificApplyEdidOverrideV2(struct DispCommon *pDispCommon, NV0073_CTRL_SPECIFIC_APPLY_EDID_OVERRIDE_V2_PARAMS *pEdidOverrideParams) {
@@ -3258,6 +3268,16 @@ static inline NV_STATUS dispcmnCtrlCmdDfpExitDisplayPowerGating(struct DispCommo
 #define dispcmnCtrlCmdDfpExitDisplayPowerGating(pDispCommon, pParams) dispcmnCtrlCmdDfpExitDisplayPowerGating_IMPL(pDispCommon, pParams)
 #endif // __nvoc_disp_objs_h_disabled
 
+NV_STATUS dispcmnCtrlCmdDfpGetDispPhyInfo_IMPL(struct DispCommon *pDispCommon, NV0073_CTRL_DFP_GET_DISP_PHY_INFO_PARAMS *pParams);
+#ifdef __nvoc_disp_objs_h_disabled
+static inline NV_STATUS dispcmnCtrlCmdDfpGetDispPhyInfo(struct DispCommon *pDispCommon, NV0073_CTRL_DFP_GET_DISP_PHY_INFO_PARAMS *pParams) {
+    NV_ASSERT_FAILED_PRECOMP("DispCommon was disabled!");
+    return NV_ERR_NOT_SUPPORTED;
+}
+#else // __nvoc_disp_objs_h_disabled
+#define dispcmnCtrlCmdDfpGetDispPhyInfo(pDispCommon, pParams) dispcmnCtrlCmdDfpGetDispPhyInfo_IMPL(pDispCommon, pParams)
+#endif // __nvoc_disp_objs_h_disabled
+
 
 // Wrapper macros for halified functions
 #define dispcmnControl_FNPTR(pDisplayApi) pDisplayApi->__nvoc_base_DisplayApi.__nvoc_metadata_ptr->vtable.__dispapiControl__
@@ -3572,6 +3592,8 @@ NV_STATUS dispcmnCtrlCmdSpecificSetMonitorPower_IMPL(struct DispCommon *pDispCom
 
 NV_STATUS dispcmnCtrlCmdSpecificSetHdmiFrlLinkConfig_IMPL(struct DispCommon *pDispCommon, NV0073_CTRL_SPECIFIC_SET_HDMI_FRL_LINK_CONFIG_PARAMS *pParams);
 
+NV_STATUS dispcmnCtrlCmdSpecificSetHdmiFrlFlushMode_IMPL(struct DispCommon *pDispCommon, NV0073_CTRL_SPECIFIC_SET_HDMI_FRL_FLUSH_MODE_PARAMS *pParams);
+
 NV_STATUS dispcmnCtrlCmdSpecificApplyEdidOverrideV2_IMPL(struct DispCommon *pDispCommon, NV0073_CTRL_SPECIFIC_APPLY_EDID_OVERRIDE_V2_PARAMS *pEdidOverrideParams);
 
 NV_STATUS dispcmnCtrlCmdSpecificGetI2cPortid_IMPL(struct DispCommon *pDispCommon, NV0073_CTRL_SPECIFIC_GET_I2C_PORTID_PARAMS *pParams);
@@ -3709,6 +3731,8 @@ NV_STATUS dispcmnCtrlCmdSpecificGetRegionalCrcs_IMPL(struct DispCommon *pDispCom
 NV_STATUS dispcmnCtrlCmdDfpEnterDisplayPowerGating_IMPL(struct DispCommon *pDispCommon, NV0073_CTRL_CMD_DFP_ENTER_DISPLAY_POWER_GATING_PARAMS *pParams);
 
 NV_STATUS dispcmnCtrlCmdDfpExitDisplayPowerGating_IMPL(struct DispCommon *pDispCommon, NV0073_CTRL_CMD_DFP_EXIT_DISPLAY_POWER_GATING_PARAMS *pParams);
+
+NV_STATUS dispcmnCtrlCmdDfpGetDispPhyInfo_IMPL(struct DispCommon *pDispCommon, NV0073_CTRL_DFP_GET_DISP_PHY_INFO_PARAMS *pParams);
 
 #undef PRIVATE_FIELD
 

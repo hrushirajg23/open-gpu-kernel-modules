@@ -3140,6 +3140,7 @@ NVEvoHAL nvEvoC9 = {
         TRUE,                                     /* supportsDPAudio192KHz */
         TRUE,                                     /* supportsInputColorSpace */
         TRUE,                                     /* supportsInputColorRange */
+        TRUE,                                     /* supportsYCbCr422OverHDMIFRL */
         NV_EVO3_SUPPORTED_DITHERING_MODES,        /* supportedDitheringModes */
         sizeof(NVC372_CTRL_IS_MODE_POSSIBLE_PARAMS), /* impStructSize */
         NV_EVO_SCALER_2TAPS,                      /* minScalerTaps */
@@ -3238,6 +3239,7 @@ NVEvoHAL nvEvoCA = {
         TRUE,                                     /* supportsDPAudio192KHz */
         TRUE,                                     /* supportsInputColorSpace */
         TRUE,                                     /* supportsInputColorRange */
+        TRUE,                                     /* supportsYCbCr422OverHDMIFRL */
         NV_EVO3_SUPPORTED_DITHERING_MODES,        /* supportedDitheringModes */
         sizeof(NVC372_CTRL_IS_MODE_POSSIBLE_PARAMS), /* impStructSize */
         NV_EVO_SCALER_2TAPS,                      /* minScalerTaps */

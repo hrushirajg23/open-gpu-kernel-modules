@@ -167,7 +167,7 @@ kgmmuSetupWarForBug2720120FmtFamily_GA100
                                          kgmmuGetPTEAperture(pKernelGmmu),
                                          kgmmuGetPTEAttr(pKernelGmmu), 0));
 
-    memdescTagAlloc(status, NV_FB_ALLOC_RM_INTERNAL_OWNER_WAR_PT, 
+    memdescTagAlloc(status, NV_FB_ALLOC_RM_INTERNAL_OWNER_WAR_PT,
                     pKernelGmmu->pWarSmallPageTable);
     NV_ASSERT_OK_OR_GOTO(status, status, failed);
 
@@ -202,7 +202,7 @@ kgmmuSetupWarForBug2720120FmtFamily_GA100
                                                kgmmuGetPTEAperture(pKernelGmmu),
                                                kgmmuGetPTEAttr(pKernelGmmu), 0), failed);
 
-    memdescTagAlloc(status, NV_FB_ALLOC_RM_INTERNAL_OWNER_WAR_PD, 
+    memdescTagAlloc(status, NV_FB_ALLOC_RM_INTERNAL_OWNER_WAR_PD,
                     pKernelGmmu->pWarPageDirectory0);
     NV_ASSERT_OK_OR_GOTO(status, status, failed);
 
@@ -377,30 +377,26 @@ kgmmuServiceMmuFault_GA100
     FIFO_MMU_EXCEPTION_DATA *pMmuExceptionData
 )
 {
+    NV_STATUS status = NV_OK;
+
     MMU_FAULT_BUFFER_ENTRY *pParsedFaultEntry = KERNEL_POINTER_FROM_NvP64(MMU_FAULT_BUFFER_ENTRY *, pParsedFaultInfo);
 
     //  If FLA fault do not reset channel
     if (pParsedFaultEntry->mmuFaultEngineId == NV_PFAULT_MMU_ENG_ID_FLA)
     {
-        if (pKernelGmmu->bReportFlaTranslationXid)
-        {
-            nvErrorLog_va((void *)pGpu,
-                DESTINATION_FLA_TRANSLATION_ERROR,
-                "FLA Fault: inst:0x%x dev:0x%x subdev:0x%x, faulted @ 0x%x_%08x. Fault is of type %s %s",
-                gpuGetInstance(pGpu),
-                gpuGetDeviceInstance(pGpu),
-                pGpu->subdeviceInstance,
-                pMmuExceptionData->addrHi,
-                pMmuExceptionData->addrLo,
-                kgmmuGetFaultTypeString_HAL(pKernelGmmu, pMmuExceptionData->faultType),
-                kfifoGetFaultAccessTypeString_HAL(pGpu, GPU_GET_KERNEL_FIFO(pGpu),
-                    pMmuExceptionData->accessType));
-        }
-
-        return NV_OK;
+        nvErrorLog_va((void *)pGpu,
+            NVLINK_REMOTE_TRANSLATION_ERROR,
+            "NVLink remote translation error: faulted @ 0x%x_%08x. Fault is of type %s %s",
+            pMmuExceptionData->addrHi,
+            pMmuExceptionData->addrLo,
+            kgmmuGetFaultTypeString_HAL(pKernelGmmu, pMmuExceptionData->faultType),
+            kfifoGetFaultAccessTypeString_HAL(pGpu, GPU_GET_KERNEL_FIFO(pGpu),
+                pMmuExceptionData->accessType));
     }
     else
     {
-        return kgmmuServiceMmuFault_GV100(pGpu, pKernelGmmu, pParsedFaultInfo, pMmuExceptionData);
+        status = kgmmuServiceMmuFault_GV100(pGpu, pKernelGmmu, pParsedFaultInfo, pMmuExceptionData);
     }
+
+    return status;
 }

@@ -171,6 +171,168 @@ static void populateAudioCaps(NVT_EDID_CEA861_INFO const * const p861ExtBlock,
     }
 }
 
+static NVHDMIPKT_RESULT SetFRLLinkRate(NVHDMIPKT_CLASS  *pThis,
+                                       const NvU32       subDevice,
+                                       const NvU32       displayId,
+                                       const NvBool      bFakeLt,
+                                       const NvBool      bLinkAssessmentOnly,
+                                       const NvU32       frlRate)
+{
+    NV0073_CTRL_SPECIFIC_SET_HDMI_FRL_LINK_CONFIG_PARAMS params = {0};
+    NVMISC_MEMSET(&params, 0, sizeof(params));
+    params.subDeviceInstance = subDevice;
+    params.displayId = displayId;
+    params.data = frlRate;
+    params.bFakeLt = bFakeLt;
+    params.bLinkAssessmentOnly = bLinkAssessmentOnly;
+
+#if NVHDMIPKT_RM_CALLS_INTERNAL
+    if (CALL_DISP_RM(NvRmControl)(pThis->clientHandles.hClient,
+                    pThis->clientHandles.hDisplay,
+                    NV0073_CTRL_CMD_SPECIFIC_SET_HDMI_FRL_CONFIG,
+                    &params,
+                    sizeof(params)) != NVOS_STATUS_SUCCESS)
+
+#else // !NVHDMIPKT_RM_CALLS_INTERNAL
+    NvBool bSuccess = pThis->callback.rmDispControl2(pThis->cbHandle,
+                                                     params.subDeviceInstance,
+                                                     NV0073_CTRL_CMD_SPECIFIC_SET_HDMI_FRL_CONFIG,
+                                                     &params,
+                                                     sizeof(params));
+    if (bSuccess == NV_FALSE)
+#endif // NVHDMIPKT_RM_CALLS_INTERNAL
+    {
+        NvHdmiPkt_Print(pThis, "ERROR - RM call to set HDMI FRL failed.");
+        NvHdmiPkt_Assert(0);
+
+        return NVHDMIPKT_FAIL;
+    }
+
+    return NVHDMIPKT_SUCCESS;
+}
+
+static NVHDMIPKT_RESULT
+SetFRLFlushMode(NVHDMIPKT_CLASS             *pThis,
+                const NvU32                  subDevice,
+                const NvU32                  displayId,
+                const NvU32                  bEnable)
+{
+    NV0073_CTRL_SPECIFIC_SET_HDMI_FRL_FLUSH_MODE_PARAMS params = {0};
+    NVMISC_MEMSET(&params, 0, sizeof(params));
+    params.subDeviceInstance = subDevice;
+    params.displayId = displayId;
+    params.bEnable = bEnable;
+
+#if NVHDMIPKT_RM_CALLS_INTERNAL
+    if (CALL_DISP_RM(NvRmControl)(pThis->clientHandles.hClient,
+                    pThis->clientHandles.hDisplay,
+                    NV0073_CTRL_CMD_SPECIFIC_SET_HDMI_FRL_FLUSH_MODE,
+                    &params,
+                    sizeof(params)) != NVOS_STATUS_SUCCESS)
+
+#else // !NVHDMIPKT_RM_CALLS_INTERNAL
+    NvBool bSuccess = pThis->callback.rmDispControl2(pThis->cbHandle,
+                                                     params.subDeviceInstance,
+                                                     NV0073_CTRL_CMD_SPECIFIC_SET_HDMI_FRL_FLUSH_MODE,
+                                                     &params,
+                                                     sizeof(params));
+    if (bSuccess == NV_FALSE)
+#endif // NVHDMIPKT_RM_CALLS_INTERNAL
+    {
+        NvHdmiPkt_Print(pThis, "ERROR - RM call to set HDMI FRL Flush Mode failed.");
+        NvHdmiPkt_Assert(0);
+
+        return NVHDMIPKT_FAIL;
+    }
+
+    return NVHDMIPKT_SUCCESS;
+}
+
+static NVHDMIPKT_RESULT
+performLinkTraningToAssessFRLLink(NVHDMIPKT_CLASS          *pThis,
+                                  NvU32                     subDevice,
+                                  NvU32                     displayId,
+                                  const NvBool              bIsDisplayActive,
+                                  const HDMI_FRL_DATA_RATE  currFRLRate,
+                                  NvU32                    *pMaxFRLRate)
+{
+    const NvU32 nv0073currFRLRate =
+        translateFRLRateToNv0073SetHdmiFrlConfig(currFRLRate);
+    NVHDMIPKT_RESULT ret = NVHDMIPKT_SUCCESS;
+    NvU32 maxFRLRate = *pMaxFRLRate;
+
+    if (bIsDisplayActive) {
+        ret = SetFRLFlushMode(pThis, subDevice, displayId,
+                              NV_TRUE /* bEnable */);
+        if (ret != NVHDMIPKT_SUCCESS)
+        {
+            NvHdmiPkt_Assert(0);
+            return ret;
+        }
+    }
+
+    while(maxFRLRate != NV0073_CTRL_HDMI_FRL_DATA_SET_FRL_RATE_NONE)
+    {
+        // If the display is active and the maximum link rate matches the link
+        // rate required for the current mode timings, avoid marking the set
+        // link configuration call as an assessment only. This prevents
+        // re-training after the assessment.
+        const NvBool bLinkAssessmentOnly =
+            bIsDisplayActive ? (nv0073currFRLRate != maxFRLRate) : NV_TRUE;
+
+        if (SetFRLLinkRate(pThis, subDevice, displayId,
+                           NV_FALSE /* bFakeLt */, bLinkAssessmentOnly,
+                           maxFRLRate) == NVHDMIPKT_SUCCESS)
+        {
+            break;
+        }
+        maxFRLRate--;
+    }
+
+    if (bIsDisplayActive)
+    {
+        // If the displayId is currently attached to the head, restore the FRL
+        // link rate to prevent the display engine from hanging.
+        if (nv0073currFRLRate != maxFRLRate)
+        {
+            const NvBool bFakeLt = (nv0073currFRLRate > maxFRLRate);
+
+            if (SetFRLLinkRate(pThis, subDevice, displayId,
+                               bFakeLt, NV_FALSE /* bLinkAssessmentOnly */,
+                               currFRLRate) != NVHDMIPKT_SUCCESS)
+            {
+                if (!bFakeLt) {
+                    if (SetFRLLinkRate(pThis, subDevice, displayId,
+                                       NV_TRUE, NV_FALSE /* bLinkAssessmentOnly */,
+                                       currFRLRate) != NVHDMIPKT_SUCCESS) {
+                        NvHdmiPkt_Assert(0);
+                    }
+                }
+            }
+        }
+
+        ret = SetFRLFlushMode(pThis, subDevice, displayId,
+                              NV_FALSE /* bEnable */);
+        if (ret != NVHDMIPKT_SUCCESS)
+        {
+            NvHdmiPkt_Assert(0);
+        }
+    }
+    else
+    {
+        NVHDMIPKT_RESULT ret = hdmiClearFRLConfigC671(pThis, subDevice,
+                                                      displayId);
+        if (ret != NVHDMIPKT_SUCCESS)
+        {
+            NvHdmiPkt_Assert(0);
+        }
+    }
+
+    *pMaxFRLRate = maxFRLRate;
+
+    return NVHDMIPKT_SUCCESS;
+}
+
 /*
  * hdmiAssessLinkCapabilities
  *
@@ -181,12 +343,15 @@ static void populateAudioCaps(NVT_EDID_CEA861_INFO const * const p861ExtBlock,
  * but for now, no incentive to do so. In future move it out to better place as need arises
  */
 static NVHDMIPKT_RESULT
-hdmiAssessLinkCapabilitiesC671(NVHDMIPKT_CLASS       *pThis,
-                               NvU32                  subDevice,
-                               NvU32                  displayId,
+hdmiAssessLinkCapabilitiesC671(NVHDMIPKT_CLASS          *pThis,
+                               NvU32                     subDevice,
+                               NvU32                     displayId,
                                NVT_EDID_INFO   const * const pSinkEdid,
-                               HDMI_SRC_CAPS         *pSrcCaps,
-                               HDMI_SINK_CAPS        *pSinkCaps)
+                               const NvBool              bPerformLinkTrainingToAssess,
+                               const NvBool              bIsDisplayActive,
+                               const HDMI_FRL_DATA_RATE  currFRLRate,
+                               HDMI_SRC_CAPS            *pSrcCaps,
+                               HDMI_SINK_CAPS           *pSinkCaps)
 {
 
     // Read DSC caps from RM - gpu caps for DSC are same across DP and HDMI FRL (HDMI 2.1+)
@@ -264,11 +429,25 @@ hdmiAssessLinkCapabilitiesC671(NVHDMIPKT_CLASS       *pThis,
     populateAudioCaps(&pSinkEdid->ext861,   pSinkCaps);
     populateAudioCaps(&pSinkEdid->ext861_2, pSinkCaps);
 
-    NvU32 setFRLRate = pSinkEdid->hdmiForumInfo.max_FRL_Rate;
+    NvU32 maxFRLRate = pSinkEdid->hdmiForumInfo.max_FRL_Rate;
 
-    pSinkCaps->linkMaxFRLRate    = translateFRLCapToFRLDataRate(setFRLRate);
+    if (bPerformLinkTrainingToAssess) {
+        NVHDMIPKT_RESULT ret = performLinkTraningToAssessFRLLink(pThis,
+                                                                 subDevice,
+                                                                 displayId,
+                                                                 bIsDisplayActive,
+                                                                 currFRLRate,
+                                                                 &maxFRLRate);
+        if (ret != NVHDMIPKT_SUCCESS) {
+            pSinkCaps->linkMaxFRLRate = HDMI_FRL_DATA_RATE_NONE;
+            pSinkCaps->linkMaxFRLRateDSC = HDMI_FRL_DATA_RATE_NONE;
+            return ret;
+        }
+    }
+
+    pSinkCaps->linkMaxFRLRate    = translateFRLCapToFRLDataRate(maxFRLRate);
     pSinkCaps->linkMaxFRLRateDSC = (pSrcCaps->dscCaps.dscCapable &&
-                                   (pSinkEdid->hdmiForumInfo.dsc_Max_FRL_Rate > setFRLRate)) ?
+                                   (pSinkEdid->hdmiForumInfo.dsc_Max_FRL_Rate > maxFRLRate)) ?
                                         pSinkCaps->linkMaxFRLRate :
                                         translateFRLCapToFRLDataRate(pSinkEdid->hdmiForumInfo.dsc_Max_FRL_Rate);
 
@@ -1238,36 +1417,9 @@ hdmiSetFRLConfigC671(NVHDMIPKT_CLASS             *pThis,
                      NvBool                       bFakeLt,
                      HDMI_FRL_CONFIG             *pFRLConfig)
 {
-    NV0073_CTRL_SPECIFIC_SET_HDMI_FRL_LINK_CONFIG_PARAMS params = {0};
-    NVMISC_MEMSET(&params, 0, sizeof(params));
-    params.subDeviceInstance = subDevice;
-    params.displayId = displayId;
-    params.data = translateFRLRateToNv0073SetHdmiFrlConfig(pFRLConfig->frlRate);
-    params.bFakeLt = bFakeLt;
-
-#if NVHDMIPKT_RM_CALLS_INTERNAL
-    if (CALL_DISP_RM(NvRmControl)(pThis->clientHandles.hClient,
-                    pThis->clientHandles.hDisplay,
-                    NV0073_CTRL_CMD_SPECIFIC_SET_HDMI_FRL_CONFIG,
-                    &params,
-                    sizeof(params)) != NVOS_STATUS_SUCCESS)
-
-#else // !NVHDMIPKT_RM_CALLS_INTERNAL
-    NvBool bSuccess = pThis->callback.rmDispControl2(pThis->cbHandle,
-                                                     params.subDeviceInstance,
-                                                     NV0073_CTRL_CMD_SPECIFIC_SET_HDMI_FRL_CONFIG, 
-                                                     &params, 
-                                                     sizeof(params));
-    if (bSuccess == NV_FALSE)
-#endif // NVHDMIPKT_RM_CALLS_INTERNAL
-    {
-        NvHdmiPkt_Print(pThis, "ERROR - RM call to set HDMI FRL failed.");
-        NvHdmiPkt_Assert(0);
-
-        return NVHDMIPKT_FAIL;
-    }
-
-    return NVHDMIPKT_SUCCESS;
+    return SetFRLLinkRate(pThis, subDevice, displayId, bFakeLt,
+                          NV_FALSE /* bLinkAssessmentOnly */,
+                          translateFRLRateToNv0073SetHdmiFrlConfig(pFRLConfig->frlRate));
 }
 
 /*
@@ -1278,34 +1430,9 @@ hdmiClearFRLConfigC671(NVHDMIPKT_CLASS    *pThis,
                        NvU32               subDevice,
                        NvU32               displayId)
 {
-    NVHDMIPKT_RESULT result = NVHDMIPKT_SUCCESS;
-
-    NV0073_CTRL_SPECIFIC_SET_HDMI_FRL_LINK_CONFIG_PARAMS params = {0};
-    NVMISC_MEMSET(&params, 0, sizeof(params));
-    params.subDeviceInstance = subDevice;
-    params.displayId         = displayId;
-    params.data              = NV0073_CTRL_HDMI_FRL_DATA_SET_FRL_RATE_NONE;
-
-#if NVHDMIPKT_RM_CALLS_INTERNAL
-    if (CALL_DISP_RM(NvRmControl)(pThis->clientHandles.hClient,
-                    pThis->clientHandles.hDisplay,
-                    NV0073_CTRL_CMD_SPECIFIC_SET_HDMI_FRL_CONFIG,
-                    &params,
-                    sizeof(params)) != NVOS_STATUS_SUCCESS)
-#else // !NVHDMIPKT_RM_CALLS_INTERNAL
-    NvBool bSuccess = pThis->callback.rmDispControl2(pThis->cbHandle,
-                                                     params.subDeviceInstance,
-                                                     NV0073_CTRL_CMD_SPECIFIC_SET_HDMI_FRL_CONFIG, 
-                                                     &params, 
-                                                     sizeof(params));
-    
-    if (bSuccess == NV_FALSE)
-#endif // NVHDMIPKT_RM_CALLS_INTERNAL
-    {
-        NvHdmiPkt_Print(pThis, "WARNING - RM call to reset HDMI FRL failed.");
-        result = NVHDMIPKT_FAIL;
-    }
-    return result;
+    return SetFRLLinkRate(pThis, subDevice, displayId,
+                          NV_FALSE, NV_FALSE /* bLinkAssessmentOnly */,
+                          NV0073_CTRL_HDMI_FRL_DATA_SET_FRL_RATE_NONE);
 }
 
 static NVHDMIPKT_RESULT 

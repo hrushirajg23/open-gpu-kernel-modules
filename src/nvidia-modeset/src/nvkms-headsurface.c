@@ -1866,7 +1866,7 @@ static void HsProcFsRecordScanline(
     const NVDispEvoRec *pDispEvo,
     const NvU32 apiHead)
 {
-#if NVKMS_PROCFS_ENABLE
+#if NVKMS_HEADSURFACE_STATS
     NVHsChannelEvoRec *pHsChannel = pDispEvo->pHsChannel[apiHead];
     NvU16 scanLine = 0;
     NvBool inBlankingPeriod = FALSE;
@@ -1890,13 +1890,13 @@ static void HsProcFsRecordScanline(
                 scanLine, pHsChannel->statistics.scanLine.vVisible);
         }
     }
-#endif /* NVKMS_PROCFS_ENABLE */
+#endif /* NVKMS_HEADSURFACE_STATS */
 }
 
 static void HsProcFsRecordPreviousFrameNotDone(
     NVHsChannelEvoPtr pHsChannel)
 {
-#if NVKMS_PROCFS_ENABLE
+#if NVKMS_HEADSURFACE_STATS
     pHsChannel->statistics.nPreviousFrameNotDone++;
 #endif
 }
@@ -1905,19 +1905,19 @@ static void HsProcFsRecordFullscreenSgFrames(
     NVHsChannelEvoPtr pHsChannel,
     NvBool isFullscreen)
 {
-#if NVKMS_PROCFS_ENABLE
+#if NVKMS_HEADSURFACE_STATS
     if (isFullscreen) {
         pHsChannel->statistics.nFullscreenSgFrames++;
     } else {
         pHsChannel->statistics.nNonFullscreenSgFrames++;
     }
-#endif /* NVKMS_PROCFS_ENABLE */
+#endif /* NVKMS_HEADSURFACE_STATS */
 }
 
 static void HsProcFsRecordOmittedNonSgHsUpdate(
     NVHsChannelEvoPtr pHsChannel)
 {
-#if NVKMS_PROCFS_ENABLE
+#if NVKMS_HEADSURFACE_STATS
     pHsChannel->statistics.nOmittedNonSgHsUpdates++;
 #endif
 }
@@ -2416,7 +2416,7 @@ void nvHsRemoveVBlankCallback(NVHsChannelEvoPtr pHsChannel)
 void nvHsAllocStatistics(
     NVHsChannelEvoRec *pHsChannel)
 {
-#if NVKMS_PROCFS_ENABLE
+#if NVKMS_HEADSURFACE_STATS
     const NVDispEvoRec *pDispEvo = pHsChannel->pDispEvo;
     const NvU32 apiHead = pHsChannel->apiHead;
     const NVHwModeTimingsEvo *pTimings =
@@ -2430,19 +2430,19 @@ void nvHsAllocStatistics(
     n = pHsChannel->statistics.scanLine.vVisible + 1;
 
     pHsChannel->statistics.scanLine.pHistogram = nvCalloc(1, sizeof(NvU64) * n);
-#endif /* NVKMS_PROCFS_ENABLE */
+#endif /* NVKMS_HEADSURFACE_STATS */
 }
 
 void nvHsFreeStatistics(
     NVHsChannelEvoRec *pHsChannel)
 {
-#if NVKMS_PROCFS_ENABLE
+#if NVKMS_HEADSURFACE_STATS
     nvFree(pHsChannel->statistics.scanLine.pHistogram);
     nvkms_memset(&pHsChannel->statistics, 0, sizeof(pHsChannel->statistics));
-#endif /* NVKMS_PROCFS_ENABLE */
+#endif /* NVKMS_HEADSURFACE_STATS */
 }
 
-#if NVKMS_PROCFS_ENABLE
+#if NVKMS_HEADSURFACE_STATS
 
 static const struct {
     const char *before;
@@ -2972,4 +2972,4 @@ void nvHsProcFs(
 
     HsProcFsScanLine(pInfoString, pHsChannel);
 }
-#endif /* NVKMS_PROCFS_ENABLE */
+#endif /* NVKMS_HEADSURFACE_STATS */

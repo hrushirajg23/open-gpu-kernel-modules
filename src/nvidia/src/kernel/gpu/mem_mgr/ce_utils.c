@@ -38,13 +38,7 @@
 #include "vgpu/rpc_headers.h"
 #include "gpu/device/device.h"
 
-#include "class/clb0b5.h" // MAXWELL_DMA_COPY_A
-#include "class/clc0b5.h" // PASCAL_DMA_COPY_A
-#include "class/clc1b5.h" // PASCAL_DMA_COPY_B
-#include "class/clc3b5.h" // VOLTA_DMA_COPY_A
-#include "class/clc5b5.h" // TURING_DMA_COPY_A
 #include "class/clc8b5.h" // HOPPER_DMA_COPY_A
-#include "class/clc86f.h" // HOPPER_CHANNEL_GPFIFO_A
 
 #include "class/cl0080.h"
 
@@ -89,6 +83,83 @@ ceutilsGetFirstAsyncCe_IMPL
     return NV_ERR_INSUFFICIENT_RESOURCES;
 }
 
+static void _ceutilsProcessCompletionCallbacks
+(
+    CeUtils *pCeUtils
+)
+{
+    NvU64 lastCompletedPayload = ceutilsUpdateProgress(pCeUtils);
+    CeUtilsCallbackList pendingCallbacks;
+    CeUtilsCallback *pCallbackEntry;
+
+    NV_PRINTF(LEVEL_INFO, "lastCompletedPayload=%llu\n", lastCompletedPayload);
+
+    listInitIntrusive(&pendingCallbacks);
+
+    portSyncSpinlockAcquire(pCeUtils->pCallbackLock);
+    while ((pCallbackEntry = listHead(&pCeUtils->completionCallbacks)) != NULL)
+    {
+        if (pCallbackEntry->payload > lastCompletedPayload)
+            break;
+
+        listRemove(&pCeUtils->completionCallbacks, pCallbackEntry);
+        listAppendExisting(&pendingCallbacks, pCallbackEntry);
+    }
+    portSyncSpinlockRelease(pCeUtils->pCallbackLock);
+
+    while ((pCallbackEntry = listHead(&pendingCallbacks)) != NULL)
+    {
+        NV_PRINTF(LEVEL_INFO, "calling completion callback payload=%llu\n", pCallbackEntry->payload);
+        pCallbackEntry->pCallback(pCallbackEntry->pArg);
+        listRemove(&pendingCallbacks, pCallbackEntry);
+        portMemFree(pCallbackEntry);
+    }
+
+    listDestroy(&pendingCallbacks);
+}
+
+static NV_STATUS
+_ceutilsInsertCallback
+(
+    CeUtils          *pCeUtils,
+    CHANNEL_PB_INFO  *pChannelPbInfo
+)
+{
+    CeUtilsCallback *pCallbackEntry;
+
+    if (pChannelPbInfo->pCompletionCallback == NULL)
+        return NV_OK;
+
+    NV_ASSERT_OR_RETURN(pCeUtils->bCompletionCallbackEnabled, NV_ERR_INVALID_ARGUMENT);
+
+    pCallbackEntry = portMemAllocNonPaged(sizeof *pCallbackEntry);
+    NV_ASSERT_OR_RETURN(pCallbackEntry != NULL, NV_ERR_NO_MEMORY);
+
+    portSyncSpinlockAcquire(pCeUtils->pCallbackLock);
+    pCallbackEntry->pCallback = pChannelPbInfo->pCompletionCallback;
+    pCallbackEntry->pArg      = pChannelPbInfo->pCompletionCallbackArg;
+    pCallbackEntry->payload   = pChannelPbInfo->payload;
+    listAppendExisting(&pCeUtils->completionCallbacks, pCallbackEntry);
+    portSyncSpinlockRelease(pCeUtils->pCallbackLock);
+
+    NV_PRINTF(LEVEL_INFO, "inserted completion callback payload=%llu\n", pCallbackEntry->payload);
+
+    return NV_OK;
+}
+
+static void
+_ceutilsSemaphoreEventCallback
+(
+    void        *pArg,
+    void        *pData,
+    NvHandle     hEvent,
+    NvU32        data,
+    NvU32        status
+)
+{
+    _ceutilsProcessCompletionCallbacks(pArg);
+}
+
 NV_STATUS
 ceutilsConstruct_IMPL
 (
@@ -101,6 +172,7 @@ ceutilsConstruct_IMPL
     NV_STATUS status = NV_OK;
     NvU64 allocFlags = pAllocParams->flags;
     pCeUtils->bForcedCeId = FLD_TEST_DRF(0050_CEUTILS, _FLAGS, _FORCE_CE_ID, _TRUE, allocFlags);
+    pCeUtils->bCompletionCallbackEnabled = FLD_TEST_DRF(0050_CEUTILS, _FLAGS, _ENABLE_COMPLETION_CB, _TRUE, allocFlags);
     NV_ASSERT_OR_RETURN(pGpu, NV_ERR_INVALID_STATE);
 
     NvBool bMIGInUse = IS_MIG_IN_USE(pGpu);
@@ -170,10 +242,7 @@ ceutilsConstruct_IMPL
     status = memmgrMemUtilsGetCopyEngineClass_HAL(pGpu, pMemoryManager, &pCeUtils->hTdCopyClass);
     NV_ASSERT_OR_GOTO(status == NV_OK, free_channel);
 
-    if (((pCeUtils->hTdCopyClass == HOPPER_DMA_COPY_A)
-        || (pCeUtils->hTdCopyClass == BLACKWELL_DMA_COPY_A)
-        || (pCeUtils->hTdCopyClass == BLACKWELL_DMA_COPY_B)
-        ) && !pChannel->bUseVasForCeCopy)
+    if (pCeUtils->hTdCopyClass >= HOPPER_DMA_COPY_A && !pChannel->bUseVasForCeCopy)
     {
         pChannel->type = FAST_SCRUBBER_CHANNEL;
         NV_PRINTF(LEVEL_INFO, "Enabled fast scrubber in construct.\n");
@@ -219,11 +288,22 @@ ceutilsConstruct_IMPL
     NV_PRINTF(LEVEL_INFO, "Channel alloc successful for ceUtils\n");
     pCeUtils->pChannel = pChannel;
 
+    pCeUtils->pCallbackLock = portSyncSpinlockCreate(portMemAllocatorGetGlobalNonPaged());
+    NV_ASSERT_TRUE_OR_GOTO(status, pCeUtils->pCallbackLock != NULL, NV_ERR_NO_MEMORY, free_client);
+
+    listInitIntrusive(&pCeUtils->completionCallbacks);
+
+    if (pCeUtils->bCompletionCallbackEnabled)
+    {
+        pChannel->callback.func = _ceutilsSemaphoreEventCallback;
+        pChannel->callback.arg  = pCeUtils;
+    }
+
     // Allocate CE states
     status = memmgrMemUtilsCopyEngineInitialize_HAL(pGpu, pMemoryManager, pChannel);
     NV_ASSERT_OR_GOTO(status == NV_OK, free_channel);
 
-    return status;
+    return NV_OK;
 
 free_channel:
     pRmApi->Free(pRmApi, pChannel->hClient, pChannel->channelId);
@@ -255,6 +335,18 @@ ceutilsDestruct_IMPL
     MemoryManager *pMemoryManager = GPU_GET_MEMORY_MANAGER(pGpu);
     RM_API *pRmApi = rmapiGetInterface(RMAPI_GPU_LOCK_INTERNAL);
     NvU32 transferFlags = pChannel->bUseBar1 ? TRANSFER_FLAGS_USE_BAR1 : TRANSFER_FLAGS_NONE;
+    NvU64 lastSubmittedPayload = pCeUtils->lastSubmittedPayload;
+
+    // flush out all the work
+    channelWaitForFinishPayload(pCeUtils->pChannel, lastSubmittedPayload);
+
+    // process all callbacks while CeUtils is fully functional
+    _ceutilsProcessCompletionCallbacks(pCeUtils);
+    portSyncSpinlockAcquire(pCeUtils->pCallbackLock);
+    NV_ASSERT(listCount(&pCeUtils->completionCallbacks) == 0);
+    portSyncSpinlockRelease(pCeUtils->pCallbackLock);
+    // make sure no new work was queued from callbacks
+    NV_ASSERT(pCeUtils->lastCompletedPayload == lastSubmittedPayload);
 
     if ((pChannel->bClientUserd) && (pChannel->pControlGPFifo != NULL))
     {
@@ -302,6 +394,10 @@ ceutilsDestruct_IMPL
     // Resource server makes sure no leak can occur
     pRmApi->Free(pRmApi, pChannel->hClient, pChannel->hClient);
     portMemFree(pChannel);
+
+    // only destroy the callbacks infra once the event is destroyed
+    listDestroy(&pCeUtils->completionCallbacks);
+    portSyncSpinlockDestroy(pCeUtils->pCallbackLock);
 }
 
 void
@@ -355,7 +451,7 @@ _ceUtilsFastScrubEnabled
     return ((pChannel->type == FAST_SCRUBBER_CHANNEL) &&
             (!pChannelPbInfo->bCeMemcopy) &&
             (pChannelPbInfo->pattern == 0) &&
-            (pChannelPbInfo->dstAddressSpace == ADDR_FBMEM) &&
+            (pChannelPbInfo->dstAddressSpace == ADDR_FBMEM || pMemoryManager->bFastScrubberSupportsSysmem) &&
             (NV_IS_ALIGNED64(pChannelPbInfo->dstAddr, MEMUTIL_SCRUB_OFFSET_ALIGNMENT)) &&
             (NV_IS_ALIGNED(pChannelPbInfo->size, MEMUTIL_SCRUB_LINE_LENGTH_ALIGNMENT)));
 }
@@ -368,12 +464,13 @@ _ceUtilsFastScrubEnabled
 static NV_STATUS
 _ceutilsSubmitPushBuffer
 (
-    OBJCHANNEL       *pChannel,
+    CeUtils          *pCeUtils,
     NvBool            bPipelined,
     NvBool            bInsertFinishPayload,
-    CHANNEL_PB_INFO * pChannelPbInfo
+    CHANNEL_PB_INFO  *pChannelPbInfo
 )
 {
+    OBJCHANNEL *pChannel = pCeUtils->pChannel;
     NV_STATUS status = NV_OK;
     NvU32 methodsLength, putIndex = 0;
 
@@ -397,6 +494,11 @@ _ceutilsSubmitPushBuffer
     {
         NV_PRINTF(LEVEL_ERROR, "Cannot get putIndex.\n");
         return status;
+    }
+
+    if (bInsertFinishPayload)
+    {
+        NV_ASSERT_OK_OR_RETURN(_ceutilsInsertCallback(pCeUtils, pChannelPbInfo));
     }
 
     if (pChannel->pbCpuVA == NULL)
@@ -512,6 +614,9 @@ ceutilsMemset_IMPL
     channelPbInfo.dstAddressSpace = memdescGetAddressSpace(pMemDesc);
     channelPbInfo.dstCpuCacheAttrib = pMemDesc->_cpuCacheAttrib;
 
+    channelPbInfo.pCompletionCallback = pParams->pCompletionCallback;
+    channelPbInfo.pCompletionCallbackArg = pParams->pCompletionCallbackArg;
+
     pageGranularity = pMemDesc->pageArrayGranularity;
     memsetLength = pParams->length;
     offset = pParams->offset;
@@ -543,7 +648,7 @@ ceutilsMemset_IMPL
 
         channelPbInfo.dstAddr = memdescGetPtePhysAddr(pMemDesc, addrTranslation, offset);;
         channelPbInfo.size = memsetSizeContig;
-        status = _ceutilsSubmitPushBuffer(pChannel, bPipelined, memsetSizeContig == memsetLength, &channelPbInfo);
+        status = _ceutilsSubmitPushBuffer(pCeUtils, bPipelined, memsetSizeContig == memsetLength, &channelPbInfo);
         if (status != NV_OK)
         {
             NV_PRINTF(LEVEL_ERROR, "Cannot submit push buffer for memset.\n");
@@ -641,6 +746,9 @@ ceutilsMemcopy_IMPL
     channelPbInfo.srcCpuCacheAttrib = pSrcMemDesc->_cpuCacheAttrib;
     channelPbInfo.dstCpuCacheAttrib = pDstMemDesc->_cpuCacheAttrib;
 
+    channelPbInfo.pCompletionCallback = pParams->pCompletionCallback;
+    channelPbInfo.pCompletionCallbackArg = pParams->pCompletionCallbackArg;
+
     channelPbInfo.bSecureCopy = pParams->bSecureCopy;
     channelPbInfo.bEncrypt = pParams->bEncrypt;
     channelPbInfo.authTagAddr = pParams->authTagAddr;
@@ -676,7 +784,7 @@ ceutilsMemcopy_IMPL
         channelPbInfo.srcAddr = memdescGetPtePhysAddr(pSrcMemDesc, srcAddrTranslation, srcOffset);
         channelPbInfo.dstAddr = memdescGetPtePhysAddr(pDstMemDesc, dstAddrTranslation, dstOffset);
         channelPbInfo.size = copySizeContig;
-        status = _ceutilsSubmitPushBuffer(pChannel, bPipelined, copySizeContig == copyLength, &channelPbInfo);
+        status = _ceutilsSubmitPushBuffer(pCeUtils, bPipelined, copySizeContig == copyLength, &channelPbInfo);
         if (status != NV_OK)
         {
             NV_PRINTF(LEVEL_ERROR, "Cannot submit push buffer for memcopy.\n");

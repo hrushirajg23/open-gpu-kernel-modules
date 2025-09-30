@@ -66,9 +66,13 @@ extern "C" {
 #include "nv_smg.h"
 
 #if defined(DEBUG) || defined(DEVELOP)
-#define NVKMS_PROCFS_ENABLE 1
+#define NVKMS_HEADSURFACE_STATS 1
+#define NVKMS_PROCFS_OBJECT_DUMP 1
+#define NVKMS_PROCFS_CRCS 1
 #else
-#define NVKMS_PROCFS_ENABLE 0
+#define NVKMS_HEADSURFACE_STATS 0
+#define NVKMS_PROCFS_OBJECT_DUMP 0
+#define NVKMS_PROCFS_CRCS 0
 #endif
 
 #define NV_DMA_EVO_PUSH_BUFFER_SIZE         (4 * 1024)
@@ -2041,8 +2045,10 @@ typedef struct _NVDispEvoRec {
     NVDevEvoPtr pDevEvo;
     NvU32      hotplugEventHandle;
     NvU32      DPIRQEventHandle;
+    NvU32      HDMIFRLRetrainEventHandle;
     NVOS10_EVENT_KERNEL_CALLBACK_EX rmHotplugCallback;
     NVOS10_EVENT_KERNEL_CALLBACK_EX rmDPIRQCallback;
+    NVOS10_EVENT_KERNEL_CALLBACK_EX rmHDMIFRLRetrainCallback;
 
     NVDispHeadStateEvoRec headState[NVKMS_MAX_HEADS_PER_DISP];
     NVDispApiHeadStateEvoRec apiHeadState[NVKMS_MAX_HEADS_PER_DISP];
@@ -2296,6 +2302,8 @@ typedef struct _NVDpyEvoRec {
     struct {
         HDMI_SRC_CAPS srcCaps;
         HDMI_SINK_CAPS sinkCaps;
+
+        NvBool reassessFrlLinkCaps : 1;
     } hdmi;
 
     struct {
@@ -2831,7 +2839,7 @@ struct _NVSurfaceEvoRec {
     NvU64 rmRefCnt;
     NvU64 structRefCnt;
 
-#if NVKMS_PROCFS_ENABLE
+#if NVKMS_PROCFS_OBJECT_DUMP
     NvBool procFsFlag;
 #endif
 
@@ -3288,6 +3296,7 @@ typedef const struct _nv_evo_hal {
         NvU32 supportsDPAudio192KHz                     :1;
         NvU32 supportsInputColorSpace                   :1;
         NvU32 supportsInputColorRange                   :1;
+        NvU32 supportsYCbCr422OverHDMIFRL               :1;
 
         NvU32 supportedDitheringModes;
         size_t impStructSize;

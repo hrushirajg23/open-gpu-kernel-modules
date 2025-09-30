@@ -644,19 +644,10 @@ static void DpyPostColorSpaceOrRangeSetEvo(NVDpyEvoPtr pDpyEvo)
     colorSpaceChanged = (pApiHeadState->attributes.color.format != colorSpace);
     colorBpcChanged = (pApiHeadState->attributes.color.bpc != colorBpc);
 
-    /* For DP, neither color space nor bpc can be changed without a modeset */
-    if (nvConnectorUsesDPLib(pDpyEvo->pConnectorEvo) &&
+    /* For DP and HDMI FRL, neither color space nor bpc can be changed without a modeset */
+    if ((nvConnectorUsesDPLib(pDpyEvo->pConnectorEvo) ||
+            (pApiHeadState->timings.protocol == NVKMS_PROTOCOL_SOR_HDMI_FRL)) &&
         (colorSpaceChanged || colorBpcChanged)) {
-        return;
-    }
-
-    /*
-     * Hardware does not support HDMI FRL with YUV422, and it is not possible
-     * to downgrade current color bpc on HDMI FRL at this point.
-     */
-    if ((pApiHeadState->timings.protocol == NVKMS_PROTOCOL_SOR_HDMI_FRL) &&
-            ((colorSpace == NV_KMS_DPY_ATTRIBUTE_CURRENT_COLOR_SPACE_YCbCr422) ||
-             (pApiHeadState->attributes.color.bpc > colorBpc))) {
         return;
     }
 

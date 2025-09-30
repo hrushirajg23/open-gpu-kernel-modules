@@ -237,6 +237,7 @@ sysmemConstruct_IMPL
 
     do
     {
+
         NV_CHECK_OK_OR_RETURN(LEVEL_INFO,
             sysmemInitAllocRequest(pGpu, pSystemMemory, pAllocRequest));
 
@@ -694,11 +695,11 @@ sysmemInitAllocRequest_HMM
 
     memUtilsInitFBAllocInfo(pAllocRequest->pUserParams, pFbAllocInfo, pAllocRequest->hClient, pAllocRequest->hParent);
 
-    NV_ASSERT_OK_OR_GOTO(status,
+    NV_CHECK_OK_OR_GOTO(status, LEVEL_ERROR,
         memmgrAllocResources(pGpu, pMemoryManager, pAllocRequest, pFbAllocInfo),
         done);
 
-    NV_ASSERT_OK_OR_GOTO(status,
+    NV_CHECK_OK_OR_GOTO(status, LEVEL_ERROR,
         sysmemAllocResources(pGpu, pMemoryManager, pAllocRequest, pFbAllocInfo, pSystemMemory),
         done);
 

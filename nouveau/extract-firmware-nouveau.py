@@ -24,6 +24,8 @@
 # Converts OpenRM binhex-encoded images to Nouveau-compatible binary blobs
 # See nouveau_firmware_layout.ods for documentation on the file format
 
+import utils.transport
+import utils.session
 import sys
 import os
 import argparse

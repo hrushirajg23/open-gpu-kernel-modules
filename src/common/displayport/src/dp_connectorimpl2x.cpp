@@ -247,13 +247,13 @@ bool ConnectorImpl2x::validateLinkConfiguration(const LinkConfiguration &lConfig
     {
         if (!IS_VALID_DP2_X_LINKBW(linkRate10M))
         {
-            DP_PRINTF(DP_ERROR, "DP2xCONN> Requested link rate=%d is not valid", linkRate10M);
+            DP_PRINTF(DP_ERROR, "DP2xCONN> Requested link rate=%" NvU64_fmtu " is not valid", linkRate10M);
             return false;
         }
 
         if (lConfig.peakRate > hal->getMaxLinkRate())
         {
-            DP_PRINTF(DP_ERROR, "DP2xCONN> Requested link rate=%d is larger than sinkMaxLinkRate=%d",
+            DP_PRINTF(DP_ERROR, "DP2xCONN> Requested link rate=%" NvU64_fmtu " is larger than sinkMaxLinkRate=%" LinkRate_fmtu,
                       linkRate10M, hal->getMaxLinkRate());
             return false;
         }
@@ -264,7 +264,7 @@ bool ConnectorImpl2x::validateLinkConfiguration(const LinkConfiguration &lConfig
             NvU32 i;
             if (!hal->isIndexedLinkrateEnabled())
             {
-                DP_PRINTF(DP_ERROR, "DP2xCONN> Indexed Link Rate=%d is Not Enabled in Sink", linkRate10M);
+                DP_PRINTF(DP_ERROR, "DP2xCONN> Indexed Link Rate=%" NvU64_fmtu " is Not Enabled in Sink", linkRate10M);
                 return false;
             }
 
@@ -279,13 +279,13 @@ bool ConnectorImpl2x::validateLinkConfiguration(const LinkConfiguration &lConfig
                     break;
                 if (ilrTable[i] == 0)
                 {
-                    DP_PRINTF(DP_ERROR, "DP2xCONN> Indexed Link Rate=%d is Not Found", linkRate10M);
+                    DP_PRINTF(DP_ERROR, "DP2xCONN> Indexed Link Rate=%" NvU64_fmtu " is Not Found", linkRate10M);
                     return false;
                 }
             }
             if (i == NV0073_CTRL_DP_MAX_INDEXED_LINK_RATES)
             {
-                DP_PRINTF(DP_ERROR, "DP2xCONN> Indexed Link Rate=%d is Not Found", linkRate10M);
+                DP_PRINTF(DP_ERROR, "DP2xCONN> Indexed Link Rate=%" NvU64_fmtu " is Not Found", linkRate10M);
                 return false;
             }
         }
@@ -657,7 +657,7 @@ bool ConnectorImpl2x::notifyAttachBegin(Group *target, const DpModesetParams &mo
         }
     }
 
-    DP_PRINTF(DP_NOTICE, "DP2xCONN> Notify Attach Begin (Head %d, pclk %d (KHz) raster %d x %d  %d bpp)",
+    DP_PRINTF(DP_NOTICE, "DP2xCONN> Notify Attach Begin (Head %d, pclk %" NvU64_fmtu " (KHz) raster %d x %d  %d bpp)",
               modesetParams.headIndex, (pixelClockHz/1000), rasterWidth, rasterHeight, depth);
     NV_DPTRACE_INFO(NOTIFY_ATTACH_BEGIN, modesetParams.headIndex, pixelClockHz, rasterWidth, rasterHeight,
                     depth, bEnableDsc, bEnableFEC);
@@ -1763,7 +1763,7 @@ bool ConnectorImpl2x::handleTestLinkTrainRequest()
                 DP_ASSERT(0 && "Compliance: no group attached");
             }
 
-            DP_PRINTF(DP_NOTICE, "DP> Compliance: LT on IRQ request: 0x%x, %d.", requestedRate, requestedLanes);
+            DP_PRINTF(DP_NOTICE, "DP> Compliance: LT on IRQ request: 0x%" LinkRate_fmtx ", %d.", requestedRate, requestedLanes);
             // now see whether the current resolution is supported on the requested link config
             LinkConfiguration lc(&linkPolicy, requestedLanes, requestedRate, hal->getEnhancedFraming(),
                                  false, // MST
@@ -1776,7 +1776,7 @@ bool ConnectorImpl2x::handleTestLinkTrainRequest()
             {
                 if (willLinkSupportMode(lc, groupAttached->lastModesetInfo, groupAttached->headIndex, NULL, NULL))
                 {
-                    DP_PRINTF(DP_NOTICE, "DP> Compliance: Executing LT on IRQ: 0x%x, %d.", requestedRate, requestedLanes);
+                    DP_PRINTF(DP_NOTICE, "DP> Compliance: Executing LT on IRQ: 0x%" LinkRate_fmtx ", %d.", requestedRate, requestedLanes);
                     // we need to force the requirement irrespective of whether is supported or not.
                     if (!enableFlush())
                     {
@@ -1801,7 +1801,7 @@ bool ConnectorImpl2x::handleTestLinkTrainRequest()
                 }
                 else // linkconfig is not supporting bandwidth. Simply return NACK
                 {
-                    DP_PRINTF(DP_ERROR, "DP> Compliance: IMP failed with requested link configuration: 0x%x, %d.",
+                    DP_PRINTF(DP_ERROR, "DP> Compliance: IMP failed with requested link configuration: 0x%" LinkRate_fmtx ", %d.",
                               requestedRate, requestedLanes);
                     hal->setTestResponse(false);
                     return false;

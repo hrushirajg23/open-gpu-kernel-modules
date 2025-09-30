@@ -852,6 +852,9 @@ virtmemAllocResources
         }
         else
         {
+            NvU64 largestSupportedPageSize       = 0;
+            NvU64 largestSupportedPageSizeBitIdx = 0;
+
             status = vaspaceAlloc(pVAS, pFbAllocInfo->size, align,
                                   pVidHeapAlloc->rangeLo, pVidHeapAlloc->rangeHi,
                                   pageSizeLockMask, flags, &pFbAllocInfo->offset);
@@ -866,6 +869,11 @@ virtmemAllocResources
                 status = NV_ERR_INSUFFICIENT_RESOURCES;
                 goto failed;
             }
+
+            largestSupportedPageSizeBitIdx = pageSizeLockMask;
+            HIGHESTBITIDX_64(largestSupportedPageSizeBitIdx);
+            largestSupportedPageSize = NVBIT64(largestSupportedPageSizeBitIdx);
+            memdescSetPageSize(pMemDesc, AT_GPU_VA, largestSupportedPageSize);
 
             memdescDescribe(pMemDesc, ADDR_VIRTUAL,
                             pFbAllocInfo->offset,

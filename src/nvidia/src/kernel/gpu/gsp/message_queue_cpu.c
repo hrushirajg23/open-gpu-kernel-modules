@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2019-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-FileCopyrightText: Copyright (c) 2019-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: MIT
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -721,7 +721,7 @@ NV_STATUS GspMsgQueueReceiveStatus(MESSAGE_QUEUE_INFO *pMQI, OBJGPU *pGpu)
         else
         {
             NV_PRINTF(LEVEL_ERROR, "Read failed after %d retries.\n", nRetries);
-            return nvStatus;
+            goto exit;
         }
     }
 
@@ -759,16 +759,14 @@ NV_STATUS GspMsgQueueReceiveStatus(MESSAGE_QUEUE_INFO *pMQI, OBJGPU *pGpu)
         nvStatus = NV_ERR_INVALID_PARAM_STRUCT;
     }
 
-    if (nvStatus == NV_OK)
-    {
-        pMQI->rxSeqNum++;
+exit:
+    pMQI->rxSeqNum++;
 
-        nRet = msgqRxMarkConsumed(pMQI->hQueue, nElements);
-        if (nRet < 0)
-        {
-            NV_PRINTF(LEVEL_ERROR, "msgqRxMarkConsumed failed: %d\n", nRet);
-            nvStatus = NV_ERR_GENERIC;
-        }
+    nRet = msgqRxMarkConsumed(pMQI->hQueue, nElements);
+    if (nRet < 0)
+    {
+        NV_PRINTF(LEVEL_ERROR, "msgqRxMarkConsumed failed: %d\n", nRet);
+        nvStatus = NV_ERR_GENERIC;
     }
 
     return nvStatus;

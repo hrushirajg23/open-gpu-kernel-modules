@@ -588,8 +588,8 @@ typedef struct nv_state_t
     /* Console is managed by drm drivers or NVKMS */
     NvBool client_managed_console;
 
-    /* Bool to check if power management is supported */
-    NvBool is_pm_supported;
+    /* Bool to check if power management is unsupported */
+    NvBool is_pm_unsupported;
 } nv_state_t;
 
 #define NVFP_TYPE_NONE       0x0

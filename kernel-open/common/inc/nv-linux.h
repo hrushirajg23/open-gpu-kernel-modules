@@ -1711,12 +1711,12 @@ static inline void nv_mutex_destroy(struct mutex *lock)
     mutex_destroy(lock);
 }
 
-static inline NvBool nv_platform_supports_numa(nv_linux_state_t *nvl)
+static inline NvBool nv_platform_supports_numa(const nv_linux_state_t *nvl)
 {
     return nvl->numa_info.node_id != NUMA_NO_NODE;
 }
 
-static inline int nv_get_numa_status(nv_linux_state_t *nvl)
+static inline int nv_get_numa_status(const nv_linux_state_t *nvl)
 {
     if (!nv_platform_supports_numa(nvl))
     {

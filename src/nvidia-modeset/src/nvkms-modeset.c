@@ -103,6 +103,14 @@
 #include "nvkms-headsurface-config.h"
 
 static NvBool
+AssignProposedHdmiFrlConfig(
+    NVProposedModeSetStateOneApiHead *pProposedApiHead,
+    NVProposedModeSetHwStateOneHead *pProposedPrimaryHead,
+    const struct NvKmsSetModeOneHeadRequest *pRequestHead, 
+    const NVDispEvoRec *pDispEvo,
+    const NVDpyEvoRec *pDpyEvo);
+
+static NvBool
 GetColorSpaceAndColorRange(
     const NVDispEvoRec *pDispEvo,
     const NvU32 apiHead,
@@ -1367,15 +1375,11 @@ AssignProposedModeSetHwState(NVDevEvoRec *pDevEvo,
              * proposed modeset state, to broadcast it onto all hardware heads
              * during modeset.
              */
-            if (!nvHdmiFrlQueryConfig(pDpyEvo,
-                                      &pRequestHead->mode.timings,
-                                      &pProposedApiHead->timings,
-                                      &pProposedApiHead->attributes.color,
-                                      (nvPopCount32(pProposedApiHead->hwHeadsMask) > 1)
-                                        /* b2Heads1Or */,
-                                      &pProposedApiHead->modeValidationParams,
-                                      &pProposedPrimaryHead->hdmiFrlConfig,
-                                      &pProposedApiHead->dscInfo)) {
+            if (!AssignProposedHdmiFrlConfig(pProposedApiHead,
+                                             pProposedPrimaryHead,
+                                             pRequestHead,
+                                             pDispEvo,
+                                             pDpyEvo)) {
                 pReply->disp[sd].head[apiHead].status =
                     NVKMS_SET_MODE_ONE_HEAD_STATUS_INVALID_MODE;
                 ret = FALSE;
@@ -1759,6 +1763,31 @@ static NvBool DowngradeColorSpaceAndBpcOneConnectorEvo(
                                          pConnectorEvo)) {
         return TRUE;
     }
+
+    return FALSE;
+}
+
+static NvBool AssignProposedHdmiFrlConfig(
+    NVProposedModeSetStateOneApiHead *pProposedApiHead,
+    NVProposedModeSetHwStateOneHead *pProposedPrimaryHead,
+    const struct NvKmsSetModeOneHeadRequest *pRequestHead, 
+    const NVDispEvoRec *pDispEvo,
+    const NVDpyEvoRec *pDpyEvo)
+{
+    do {  
+        if (nvHdmiFrlQueryConfigOneColorSpaceAndBpc(pDpyEvo,
+                                                    &pRequestHead->mode.timings,
+                                                    &pProposedApiHead->timings,
+                                                    &pProposedApiHead->attributes.color,
+                                                    (nvPopCount32(pProposedApiHead->hwHeadsMask) > 1)
+                                                    /* b2Heads1Or */,
+                                                    &pProposedApiHead->modeValidationParams,
+                                                    &pProposedPrimaryHead->hdmiFrlConfig,
+                                                    &pProposedApiHead->dscInfo)) {
+            return TRUE;
+        } 
+
+    } while (DowngradeColorSpaceAndBpcOneHead(pDispEvo, pProposedApiHead));
 
     return FALSE;
 }

@@ -150,13 +150,8 @@ static NV_STATUS get_gpu_caps(uvm_gpu_t *gpu)
 
         gpu->mem_info.numa.enabled = true;
         gpu->mem_info.numa.node_id = gpu_caps.numaNodeId;
-        gpu->mem_info.cdmm_enabled = false;
     }
     else {
-        // TODO: Bug 5273146: Use RM control call to detect CDMM mode.
-        if (uvm_parent_gpu_is_coherent(gpu->parent))
-            gpu->mem_info.cdmm_enabled = true;
-
         gpu->mem_info.numa.node_id = NUMA_NO_NODE;
     }
 
@@ -248,16 +243,15 @@ static NV_STATUS alloc_and_init_address_space(uvm_gpu_t *gpu)
     return NV_OK;
 }
 
-int uvm_device_p2p_static_bar(uvm_gpu_t *gpu)
+int uvm_device_p2p_static_bar(uvm_parent_gpu_t *parent_gpu)
 {
-    return nv_bar_index_to_os_bar_index(gpu->parent->pci_dev, NV_GPU_BAR_INDEX_FB);
+    return nv_bar_index_to_os_bar_index(parent_gpu->pci_dev, NV_GPU_BAR_INDEX_FB);
 }
 
 static NV_STATUS get_gpu_fb_info(uvm_gpu_t *gpu)
 {
     NV_STATUS status;
     UvmGpuFbInfo fb_info = {0};
-    unsigned long pci_bar1_addr = pci_resource_start(gpu->parent->pci_dev, uvm_device_p2p_static_bar(gpu));
 
     status = uvm_rm_locked_call(nvUvmInterfaceGetFbInfo(uvm_gpu_device_handle(gpu), &fb_info));
     if (status != NV_OK)
@@ -270,9 +264,6 @@ static NV_STATUS get_gpu_fb_info(uvm_gpu_t *gpu)
     }
 
     gpu->mem_info.max_vidmem_page_size = fb_info.maxVidmemPageSize;
-    gpu->mem_info.static_bar1_start = pci_bar1_addr + fb_info.staticBar1StartOffset;
-    gpu->mem_info.static_bar1_size = fb_info.staticBar1Size;
-    gpu->mem_info.static_bar1_write_combined = fb_info.bStaticBar1WriteCombined;
 
     return NV_OK;
 }
@@ -1443,8 +1434,16 @@ static NV_STATUS init_parent_gpu(uvm_parent_gpu_t *parent_gpu,
     if (status != NV_OK)
         return status;
 
-    if (!fb_info.bZeroFb)
+    if (!fb_info.bZeroFb) {
+        unsigned long pci_bar1_addr = pci_resource_start(parent_gpu->pci_dev, uvm_device_p2p_static_bar(parent_gpu));
+
         parent_gpu->max_allocatable_address = fb_info.maxAllocatableAddress;
+        parent_gpu->static_bar1_start = pci_bar1_addr + fb_info.staticBar1StartOffset;
+        parent_gpu->static_bar1_size = fb_info.staticBar1Size;
+        parent_gpu->static_bar1_write_combined = fb_info.bStaticBar1WriteCombined;
+    }
+
+    parent_gpu->cdmm_enabled = gpu_info->cdmmEnabled;
 
     parent_gpu->virt_mode = gpu_info->virtMode;
     if (parent_gpu->virt_mode == UVM_VIRT_MODE_LEGACY) {
@@ -1492,6 +1491,8 @@ static NV_STATUS init_parent_gpu(uvm_parent_gpu_t *parent_gpu,
                       uvm_parent_gpu_name(parent_gpu));
         return status;
     }
+
+    uvm_pmm_gpu_device_p2p_init(parent_gpu);
 
     status = uvm_ats_add_gpu(parent_gpu);
     if (status != NV_OK) {
@@ -1597,7 +1598,7 @@ static NV_STATUS init_gpu(uvm_gpu_t *gpu, const UvmGpuInfo *gpu_info)
         return status;
     }
 
-    uvm_pmm_gpu_device_p2p_init(gpu);
+    uvm_mutex_init(&gpu->device_p2p_lock, UVM_LOCK_ORDER_GLOBAL);
 
     status = init_semaphore_pools(gpu);
     if (status != NV_OK) {
@@ -1731,6 +1732,8 @@ static void deinit_parent_gpu(uvm_parent_gpu_t *parent_gpu)
     // Return ownership to RM
     uvm_parent_gpu_deinit_isr(parent_gpu);
 
+    uvm_pmm_gpu_device_p2p_deinit(parent_gpu);
+
     uvm_pmm_devmem_deinit(parent_gpu);
     uvm_ats_remove_gpu(parent_gpu);
 
@@ -1785,8 +1788,6 @@ static void deinit_gpu(uvm_gpu_t *gpu)
     deconfigure_address_space(gpu);
 
     deinit_semaphore_pools(gpu);
-
-    uvm_pmm_gpu_device_p2p_deinit(gpu);
 
     uvm_pmm_gpu_deinit(&gpu->pmm);
 

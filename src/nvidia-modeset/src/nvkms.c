@@ -5345,7 +5345,7 @@ fail:
 
 extern const char *const pNV_KMS_ID;
 
-#if NVKMS_PROCFS_ENABLE
+#if NVKMS_PROCFS_OBJECT_DUMP
 
 static const char *ProcFsPerOpenTypeString(
     enum NvKmsPerOpenType type)
@@ -5713,44 +5713,6 @@ ProcFsPrintSurfaces(
     }
 }
 
-static void
-ProcFsPrintHeadSurface(
-    void *data,
-    char *buffer,
-    size_t size,
-    nvkms_procfs_out_string_func_t *outString)
-{
-    NVDevEvoPtr pDevEvo;
-    NVDispEvoPtr pDispEvo;
-    NvU32 dispIndex, apiHead;
-    NVEvoInfoStringRec infoString;
-
-    FOR_ALL_EVO_DEVS(pDevEvo) {
-
-        nvInitInfoString(&infoString, buffer, size);
-        nvEvoLogInfoString(&infoString,
-                           "pDevEvo (deviceId:%02d)         : %p",
-                           pDevEvo->deviceId.rmDeviceId, pDevEvo);
-        outString(data, buffer);
-
-        FOR_ALL_EVO_DISPLAYS(pDispEvo, dispIndex, pDevEvo) {
-
-            nvInitInfoString(&infoString, buffer, size);
-            nvEvoLogInfoString(&infoString,
-                               " pDispEvo (dispIndex:%02d)      : %p",
-                               dispIndex, pDispEvo);
-            outString(data, buffer);
-
-            for (apiHead = 0; apiHead < pDevEvo->numApiHeads; apiHead++) {
-                nvInitInfoString(&infoString, buffer, size);
-                nvHsProcFs(&infoString, pDevEvo, dispIndex, apiHead);
-                nvEvoLogInfoString(&infoString, "");
-                outString(data, buffer);
-            }
-        }
-    }
-}
-
 static const char *SwapGroupPerEyeStereoString(const NvU32 request)
 {
     const NvU32 value =
@@ -5942,6 +5904,50 @@ ProcFsPrintDeferredRequestFifos(
     }
 }
 
+
+#endif /* NVKMS_PROCFS_OBJECT_DUMP */
+
+#if NVKMS_HEADSURFACE_STATS
+static void
+ProcFsPrintHeadSurface(
+    void *data,
+    char *buffer,
+    size_t size,
+    nvkms_procfs_out_string_func_t *outString)
+{
+    NVDevEvoPtr pDevEvo;
+    NVDispEvoPtr pDispEvo;
+    NvU32 dispIndex, apiHead;
+    NVEvoInfoStringRec infoString;
+
+    FOR_ALL_EVO_DEVS(pDevEvo) {
+
+        nvInitInfoString(&infoString, buffer, size);
+        nvEvoLogInfoString(&infoString,
+                           "pDevEvo (deviceId:%02d)         : %p",
+                           pDevEvo->deviceId.rmDeviceId, pDevEvo);
+        outString(data, buffer);
+
+        FOR_ALL_EVO_DISPLAYS(pDispEvo, dispIndex, pDevEvo) {
+
+            nvInitInfoString(&infoString, buffer, size);
+            nvEvoLogInfoString(&infoString,
+                               " pDispEvo (dispIndex:%02d)      : %p",
+                               dispIndex, pDispEvo);
+            outString(data, buffer);
+
+            for (apiHead = 0; apiHead < pDevEvo->numApiHeads; apiHead++) {
+                nvInitInfoString(&infoString, buffer, size);
+                nvHsProcFs(&infoString, pDevEvo, dispIndex, apiHead);
+                nvEvoLogInfoString(&infoString, "");
+                outString(data, buffer);
+            }
+        }
+    }
+}
+#endif /* NVKMS_HEADSURFACE_STATS */
+
+#if NVKMS_PROCFS_CRCS
 static void
 ProcFsPrintDpyCrcs(
     void *data,
@@ -6024,17 +6030,37 @@ ProcFsPrintDpyCrcs(
         }
     }
 }
+#endif /* NVKMS_PROCFS_CRCS */
 
 static const char *
-SignalFormatString(NvKmsConnectorSignalFormat signalFormat)
+SignalFormatString(const enum nvKmsTimingsProtocol protocol)
 {
-    switch (signalFormat) {
-    case NVKMS_CONNECTOR_SIGNAL_FORMAT_VGA:     return "VGA";
-    case NVKMS_CONNECTOR_SIGNAL_FORMAT_LVDS:    return "LVDS";
-    case NVKMS_CONNECTOR_SIGNAL_FORMAT_TMDS:    return "TMDS";
-    case NVKMS_CONNECTOR_SIGNAL_FORMAT_DP:      return "DP";
-    case NVKMS_CONNECTOR_SIGNAL_FORMAT_DSI:     return "DSI";
-    case NVKMS_CONNECTOR_SIGNAL_FORMAT_UNKNOWN: break;
+    switch (protocol) {
+    case NVKMS_PROTOCOL_DAC_RGB:
+        return "VGA";
+
+    case NVKMS_PROTOCOL_SOR_SINGLE_TMDS_A:
+    case NVKMS_PROTOCOL_SOR_SINGLE_TMDS_B:
+        return "TMDS";
+
+    case NVKMS_PROTOCOL_SOR_DUAL_TMDS:
+        return "Dual TMDS";
+
+    case NVKMS_PROTOCOL_SOR_DP_A:
+    case NVKMS_PROTOCOL_SOR_DP_B:
+        return "DP";
+
+    case NVKMS_PROTOCOL_SOR_LVDS_CUSTOM:
+        return "LVDS";
+
+    case NVKMS_PROTOCOL_SOR_HDMI_FRL:
+        return "HDMI FRL";
+
+    case NVKMS_PROTOCOL_DSI:
+        return "DSI";
+
+    case NVKMS_PROTOCOL_PIOR_EXT_TMDS_ENC:
+        return "EXT TMDS";
     }
 
     return "unknown";
@@ -6070,27 +6096,24 @@ ProcFsPrintHeads(
 
         nvInitInfoString(&infoString, buffer, size);
         nvEvoLogInfoString(&infoString,
-                "pDevEvo (deviceId:%02d)         : %p",
-                pDevEvo->deviceId.rmDeviceId, pDevEvo);
+                "deviceId                     : %02d",
+                pDevEvo->deviceId.rmDeviceId);
         outString(data, buffer);
 
         FOR_ALL_EVO_DISPLAYS(pDispEvo, dispIndex, pDevEvo) {
             const NVLockGroup *pLockGroup = pDispEvo->pLockGroup;
 
-            nvInitInfoString(&infoString, buffer, size);
-            nvEvoLogInfoString(&infoString,
-                    " pDispEvo (dispIndex:%02d)      : %p",
-                    dispIndex, pDispEvo);
             if (pLockGroup != NULL) {
                 const NvBool flipLocked = nvIsLockGroupFlipLocked(pLockGroup);
+                nvInitInfoString(&infoString, buffer, size);
                 nvEvoLogInfoString(&infoString,
-                        "  pLockGroup                    : %p",
+                        " pLockGroup                  : %p",
                         pLockGroup);
                 nvEvoLogInfoString(&infoString,
-                        "   flipLock                     : %s",
+                        "  flipLock                   : %s",
                         flipLocked ? "yes" : "no");
+                outString(data, buffer);
             }
-            outString(data, buffer);
 
             if (pDevEvo->coreInitMethodsPending) {
                 /* If the core channel has been allocated but no mode has yet
@@ -6098,7 +6121,7 @@ ProcFsPrintHeads(
                  * driven by the console, but data like the mode timings will
                  * be bogus. */
                 nvInitInfoString(&infoString, buffer, size);
-                nvEvoLogInfoString(&infoString, "  (not yet initialized)");
+                nvEvoLogInfoString(&infoString, " (not yet initialized)");
                 outString(data, buffer);
                 continue;
             }
@@ -6114,29 +6137,43 @@ ProcFsPrintHeads(
                 nvInitInfoString(&infoString, buffer, size);
                 if (pConnectorEvo == NULL) {
                     nvEvoLogInfoString(&infoString,
-                            "  head %d                      : inactive",
+                            " head %d                      : inactive",
                             head);
                 } else {
                     const NvU32 refreshRate10kHz =
                         nvGetRefreshRate10kHz(pHwModeTimings);
+                    const NVDpyEvoRec *pDpyEvo;
+
+                    /* Find the dpy driven by this head.  Multiple heads may be
+                     * driving the same dpy with 2head1or, but a head should
+                     * only drive one dpy at a time. */
+                    FOR_ALL_EVO_DPYS(pDpyEvo, pDispEvo->validDisplays, pDispEvo) {
+                        const NvU32 apiHead = pDpyEvo->apiHead;
+                        if (apiHead == NV_INVALID_HEAD) {
+                            continue;
+                        }
+                        if (pDispEvo->apiHeadState[apiHead].hwHeadsMask &
+                            NVBIT(head)) {
+                            nvEvoLogInfoString(&infoString,
+                                    " head %d                      : %s",
+                                    head, pDpyEvo->name);
+                            break;
+                        }
+                    }
 
                     nvEvoLogInfoString(&infoString,
-                            "  head %d                      : %s",
-                            head, pConnectorEvo->name);
+                            "  protocol                   : %s",
+                            SignalFormatString(pHwModeTimings->protocol));
 
                     nvEvoLogInfoString(&infoString,
-                            "   protocol                   : %s",
-                            SignalFormatString(pConnectorEvo->signalFormat));
-
-                    nvEvoLogInfoString(&infoString,
-                            "   mode                       : %u x %u @ %u.%04u Hz",
+                            "  mode                       : %u x %u @ %u.%04u Hz",
                             nvEvoVisibleWidth(pHwModeTimings),
                             nvEvoVisibleHeight(pHwModeTimings),
                             refreshRate10kHz / 10000,
                             refreshRate10kHz % 10000);
 
                     nvEvoLogInfoString(&infoString,
-                            "   depth                      : %s",
+                            "  depth                      : %s",
                             PixelDepthString(pHeadState->pixelDepth));
                 }
                 outString(data, buffer);
@@ -6145,25 +6182,107 @@ ProcFsPrintHeads(
     }
 }
 
-#endif /* NVKMS_PROCFS_ENABLE */
+/*
+ * Dump all dpys for all devices, grouped by connector.
+ * With DP MST there may be multiple dpys on the same connector.
+ */
+static void
+ProcFsPrintDpys(
+    void *data,
+    char *buffer,
+    size_t size,
+    nvkms_procfs_out_string_func_t *outString)
+{
+    const NVDevEvoRec *pDevEvo;
+    const NVDispEvoRec *pDispEvo;
+    NvU32 dispIndex;
+    NVEvoInfoStringRec infoString;
+
+    FOR_ALL_EVO_DEVS(pDevEvo) {
+
+        nvInitInfoString(&infoString, buffer, size);
+        nvEvoLogInfoString(&infoString,
+                "deviceId                     : %02d",
+                pDevEvo->deviceId.rmDeviceId);
+        outString(data, buffer);
+
+        FOR_ALL_EVO_DISPLAYS(pDispEvo, dispIndex, pDevEvo) {
+
+            const NVConnectorEvoRec *pConnectorEvo;
+
+            FOR_ALL_EVO_CONNECTORS(pConnectorEvo, pDispEvo) {
+                const NVDpyEvoRec *pDpyEvo;
+
+                nvInitInfoString(&infoString, buffer, size);
+                nvEvoLogInfoString(&infoString,
+                        " connector                   : %s",
+                        pConnectorEvo->name);
+                outString(data, buffer);
+
+                FOR_ALL_EVO_DPYS(pDpyEvo, pDispEvo->validDisplays, pDispEvo) {
+                    const char *name;
+
+                    if (pDpyEvo->pConnectorEvo != pConnectorEvo) {
+                        continue;
+                    }
+
+                    nvInitInfoString(&infoString, buffer, size);
+                    if (nvDpyIdIsInDpyIdList(pDpyEvo->id,
+                                             pDispEvo->connectedDisplays)) {
+
+                        name = pDpyEvo->name;
+                    } else {
+                        name = "(not connected)";
+                    }
+
+                    nvEvoLogInfoString(&infoString,
+                            "  dpy                        : %s", name);
+
+                    if (pDpyEvo->edid.length) {
+                        NvU32 i;
+                        const NvU8 *buf = pDpyEvo->edid.buffer;
+                        nvEvoLogInfoStringRaw(&infoString,
+                            "   edid                      :");
+
+                        for (i = 0; i < pDpyEvo->edid.length; i++) {
+                            if (i % 16 == 0) {
+                                nvEvoLogInfoStringRaw(&infoString, "\n  ");
+                            }
+                            if (i % 8 == 0) {
+                                nvEvoLogInfoStringRaw(&infoString, " ");
+                            }
+                            nvEvoLogInfoStringRaw(&infoString, " %02x",
+                                                  buf[i]);
+                        }
+                        nvEvoLogInfoStringRaw(&infoString, "\n");
+                    }
+                    outString(data, buffer);
+                }
+            }
+        }
+    }
+}
 
 void nvKmsGetProcFiles(const nvkms_procfs_file_t **ppProcFiles)
 {
-#if NVKMS_PROCFS_ENABLE
     static const nvkms_procfs_file_t procFiles[] = {
+#if NVKMS_PROCFS_OBJECT_DUMP
         { "clients",                ProcFsPrintClients },
         { "surfaces",               ProcFsPrintSurfaces },
-        { "headsurface",            ProcFsPrintHeadSurface },
         { "deferred-request-fifos", ProcFsPrintDeferredRequestFifos },
+#endif
+#if NVKMS_HEADSURFACE_STATS
+        { "headsurface",            ProcFsPrintHeadSurface },
+#endif
+#if NVKMS_PROCFS_CRCS
         { "crcs",                   ProcFsPrintDpyCrcs },
+#endif
         { "heads",                  ProcFsPrintHeads },
+        { "dpys",                   ProcFsPrintDpys },
         { NULL, NULL },
     };
 
     *ppProcFiles = procFiles;
-#else
-    *ppProcFiles = NULL;
-#endif
 }
 
 static void FreeGlobalState(void)

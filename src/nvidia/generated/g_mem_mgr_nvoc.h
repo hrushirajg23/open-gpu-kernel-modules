@@ -669,6 +669,7 @@ struct MemoryManager {
     struct Heap *pHeap;
     NvBool bScrubOnFreeEnabled;
     NvBool bFastScrubberEnabled;
+    NvBool bFastScrubberSupportsSysmem;
     NvBool bSysmemPageSizeDefaultAllowLargePages;
     NvBool bDisableAsyncScrubforMods;
     NvBool bUseVasForCeMemoryOps;

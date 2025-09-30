@@ -1134,6 +1134,14 @@ kceMapPceLceForScrub_GB100
             for (index = 0; index < pcesPerHshub; ++index)
             {
                 pceIndex = CE_GET_LOWEST_AVAILABLE_IDX((pAvailablePceMaskForConnectingHub[hshubIndex] & supportedPceMask));
+                if (pceIndex >= NV2080_CTRL_MAX_PCES)
+                {
+                    //
+                    // Scrub limits 2 PCEs per HSHUB. If not enough are available
+                    // it is acceptable to continue mapping on the next HSHUB
+                    //
+                    continue;
+                }
 
                 if (pceIndex < kceGetPce2lceConfigSize1_HAL(pKCeIter))
                 {

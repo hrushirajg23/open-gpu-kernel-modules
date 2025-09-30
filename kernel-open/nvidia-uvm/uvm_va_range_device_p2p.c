@@ -47,6 +47,11 @@ void uvm_va_range_device_p2p_exit(void)
     kmem_cache_destroy_safe(&g_uvm_va_range_device_p2p_cache);
 }
 
+static bool device_p2p_uses_zone_device(uvm_parent_gpu_t *gpu)
+{
+    return !uvm_parent_gpu_is_coherent(gpu) || gpu->cdmm_enabled;
+}
+
 static NvU64 p2p_mem_page_count(uvm_device_p2p_mem_t *p2p_mem)
 {
     return (p2p_mem->pfn_count * p2p_mem->page_size) >> PAGE_SHIFT;
@@ -74,9 +79,11 @@ void uvm_va_range_free_device_p2p_mem(uvm_device_p2p_mem_t *p2p_mem)
     NvU64 i;
     uvm_gpu_t *gpu = p2p_mem->gpu;
 
-    // In the coherent case we don't hold references on the page because RM does
-    // via the duplicated handle.
-    if (!uvm_parent_gpu_is_coherent(gpu->parent)) {
+    // If normal, non-zone-device pages are used for providing device p2p
+    // functionality RM will already hold a reference on the page via the
+    // duplicated handle. Therefore UVM skipped taking a reference on the page
+    // so don't need to return one.
+    if (device_p2p_uses_zone_device(gpu->parent)) {
         uvm_mutex_lock(&gpu->device_p2p_lock);
 
         // It's possible that another range has been setup for the handle since
@@ -128,13 +135,13 @@ static void deinit_device_p2p_mem(uvm_device_p2p_mem_t *p2p_mem, struct list_hea
     // scheduling work which may not happen holding the va_space lock. Coherent
     // systems don't need to take the lock because the p2p_mem objects are not
     // shared between multiple va_ranges.
-    if (!uvm_parent_gpu_is_coherent(p2p_mem->gpu->parent))
+    if (device_p2p_uses_zone_device(p2p_mem->gpu->parent))
         uvm_mutex_lock_nested(&p2p_mem->gpu->device_p2p_lock);
 
     p2p_mem->deferred_free_list = deferred_free_list;
     nv_kref_put(&p2p_mem->va_range_count, put_device_p2p_mem);
 
-    if (!uvm_parent_gpu_is_coherent(p2p_mem->gpu->parent))
+    if (device_p2p_uses_zone_device(p2p_mem->gpu->parent))
         uvm_mutex_unlock_nested(&p2p_mem->gpu->device_p2p_lock);
 }
 
@@ -225,6 +232,8 @@ static NV_STATUS get_gpu_pfns(uvm_gpu_t *gpu,
     // start address or system memory start address and right shifting by
     // PAGE_SHIFT.
     for (i = 0; i < ext_mapping_info.numWrittenPhysAddrs; i++)
+        // MEMORY_DEVICE_COHERENT pages are in the system memory window so are
+        // the same as normal struct pages for the purposes of calculating pfn.
         if (uvm_parent_gpu_is_coherent(gpu->parent)) {
             NvU64 last_pfn = gpu->parent->system_bus.memory_window_end >> PAGE_SHIFT;
 
@@ -234,9 +243,9 @@ static NV_STATUS get_gpu_pfns(uvm_gpu_t *gpu,
                 return NV_ERR_INVALID_ADDRESS;
         }
         else {
-            NvU64 last_pfn = ((gpu->mem_info.static_bar1_start + gpu->mem_info.static_bar1_size) >> PAGE_SHIFT) - 1;
+            NvU64 last_pfn = ((gpu->parent->static_bar1_start + gpu->parent->static_bar1_size) >> PAGE_SHIFT) - 1;
 
-            pfns[i] = (gpu->mem_info.static_bar1_start + pfns[i]) >> PAGE_SHIFT;
+            pfns[i] = (gpu->parent->static_bar1_start + pfns[i]) >> PAGE_SHIFT;
             UVM_ASSERT(pfns[i] <= last_pfn);
             if (pfns[i] > last_pfn)
                 return NV_ERR_INVALID_ADDRESS;
@@ -253,27 +262,26 @@ static bool pci_p2pdma_page_free(struct page *page) {
 // page->zone_device_data does not exist in kernels versions older than v5.3
 // which don't support CONFIG_PCI_P2PDMA. Therefore we need these accessor
 // functions to ensure compilation succeeeds on older kernels.
-static void pci_p2pdma_page_set_zone_device_data(struct page *page, void *zone_device_data)
+static void page_set_zone_device_data(struct page *page, void *zone_device_data)
 {
     page->zone_device_data = zone_device_data;
 }
 
-static void *pci_p2pdma_page_get_zone_device_data(struct page *page)
+static void *page_get_zone_device_data(struct page *page)
 {
     return page->zone_device_data;
 }
 #else
 static bool pci_p2pdma_page_free(struct page *page) {
-    UVM_ASSERT(0);
     return false;
 }
 
-static void pci_p2pdma_page_set_zone_device_data(struct page *page, void *zone_device_data)
+static void page_set_zone_device_data(struct page *page, void *zone_device_data)
 {
     UVM_ASSERT(0);
 }
 
-static void *pci_p2pdma_page_get_zone_device_data(struct page *page)
+static void *page_get_zone_device_data(struct page *page)
 {
     UVM_ASSERT(0);
     return NULL;
@@ -335,7 +343,7 @@ static NV_STATUS alloc_device_p2p_mem(uvm_gpu_t *gpu,
     for (i = 0; i < p2p_mem_page_count(p2p_mem); i++) {
         struct page *page = p2p_mem_get_page(p2p_mem, i);
 
-        if (!pci_p2pdma_page_free(page)) {
+        if (!gpu->parent->cdmm_enabled && !pci_p2pdma_page_free(page)) {
             UVM_ASSERT(0);
 
             // This will leak the RM handle because we don't release it.
@@ -345,7 +353,23 @@ static NV_STATUS alloc_device_p2p_mem(uvm_gpu_t *gpu,
             return NV_ERR_INVALID_ARGUMENT;
         }
 
-        pci_p2pdma_page_set_zone_device_data(page, p2p_mem);
+        page_set_zone_device_data(page, p2p_mem);
+
+#if UVM_CDMM_PAGES_SUPPORTED()
+        // RM doesn't use DEVICE_COHERENT pages and therefore won't already hold
+        // a reference to them, so take one now if using DEVICE_COHERENT pages.
+        if (gpu->parent->cdmm_enabled) {
+            get_page(page);
+            get_dev_pagemap(page_to_pfn(page), NULL);
+        }
+#else
+        // CDMM P2PDMA will never be enabled for this case
+        if (gpu->parent->cdmm_enabled) {
+            UVM_ASSERT(0);
+            break;
+        }
+#endif
+
         nv_kref_get(&p2p_mem->refcount);
     }
 
@@ -400,7 +424,7 @@ static NV_STATUS alloc_pci_device_p2p(uvm_gpu_t *gpu,
     // also ensures if we don't find a p2p_mem object that we don't race with
     // some other thread assigning or clearing zone_device_data.
     uvm_mutex_lock(&gpu->device_p2p_lock);
-    p2p_mem = pci_p2pdma_page_get_zone_device_data(pfn_to_page(pfn));
+    p2p_mem = page_get_zone_device_data(pfn_to_page(pfn));
     if (!p2p_mem) {
         // We have not previously allocated p2pdma pages for this RM handle so do
         // so now.
@@ -513,12 +537,12 @@ NV_STATUS uvm_api_alloc_device_p2p(UVM_ALLOC_DEVICE_P2P_PARAMS *params, struct f
     if (!gpu)
         return NV_ERR_INVALID_DEVICE;
 
-    if (!gpu->device_p2p_initialised) {
+    if (!gpu->parent->device_p2p_initialised) {
         status = NV_ERR_NOT_SUPPORTED;
         goto out_release;
     }
 
-    if (uvm_parent_gpu_is_coherent(gpu->parent)) {
+    if (uvm_parent_gpu_is_coherent(gpu->parent) && !device_p2p_uses_zone_device(gpu->parent)) {
         status = alloc_coherent_device_p2p(gpu, params->hClient, params->hMemory, &p2p_mem);
         if (status != NV_OK)
             goto out_release;

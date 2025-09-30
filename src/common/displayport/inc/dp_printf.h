@@ -43,10 +43,6 @@ typedef enum
     DP_FATAL,
 } DP_LOG_LEVEL;
 
-#if defined(_DEBUG) || defined(DEBUG)
 #define DP_PRINTF(severity, format, ...) dpPrintf(severity, format, ##__VA_ARGS__)
-#else
-#define DP_PRINTF(severity, format, ...)
-#endif // _DEBUG || DEBUG
 
 #endif // INCLUDED_DP_PRINTF_H

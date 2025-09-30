@@ -116,6 +116,8 @@
 #define READ_CHANNEL_PAYLOAD_SEMA(channel)  channelReadChannelMemdesc(channel, channel->finishPayloadOffset)
 #define READ_CHANNEL_PB_SEMA(channel)       channelReadChannelMemdesc(channel, channel->semaOffset)
 
+typedef void (*ChannelCompletionCallback)(void *);
+
 //
 // This struct contains parameters needed to send a pushbuffer for a CE
 // operation. This interface only supports contiguous operations.
@@ -134,6 +136,8 @@ typedef struct
     NV_ADDRESS_SPACE srcAddressSpace;
     NvU32 dstCpuCacheAttrib;
     NvU32 srcCpuCacheAttrib;
+    ChannelCompletionCallback pCompletionCallback;
+    void *pCompletionCallbackArg;
 
     NvBool bSecureCopy; // The copy encrypts/decrypts protected memory
     NvBool bEncrypt; // encrypt/decrypt

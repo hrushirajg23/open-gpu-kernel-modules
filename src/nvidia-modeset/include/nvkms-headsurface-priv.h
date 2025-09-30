@@ -277,7 +277,7 @@ typedef struct _NVHsChannelEvoRec {
      */
     NVRgLine1CallbackPtr pRgIntrCallback;
 
-#if NVKMS_PROCFS_ENABLE
+#if NVKMS_HEADSURFACE_STATS
 
     /*
      * We track statistics differently for SwapGroup and non-SwapGroup
@@ -342,7 +342,7 @@ typedef struct _NVHsChannelEvoRec {
     } statistics;
 #else
 #define NVKMS_HEADSURFACE_STATS_MAX_SEMAPHORES 0
-#endif /* NVKMS_PROCFS_ENABLE */
+#endif /* NVKMS_HEADSURFACE_STATS */
 
     /*
      * We need one semaphore for the non-stall interrupt following rendering to

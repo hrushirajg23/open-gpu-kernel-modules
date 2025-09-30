@@ -430,6 +430,8 @@ typedef enum NV2080_CTRL_CE_LCE_TYPE {
  *
  *  [in] lceType
  *      LCE type. Should be one of NV2080_CTRL_CE_LCE_TYPE_* values.
+ *  [in] metadataForLceType
+ *      Metadata for LCE type.
  *  [out] numPces
  *      Number of PCEs supported per LCE
  *  [out] numLces
@@ -450,6 +452,7 @@ typedef enum NV2080_CTRL_CE_LCE_TYPE {
 
 typedef struct NV2080_CTRL_INTERNAL_CE_GET_PCE_CONFIG_FOR_LCE_TYPE_PARAMS {
     NV2080_CTRL_CE_LCE_TYPE lceType;
+    NvU32                   metadataForLceType;
     NvU32                   numPces;
     NvU32                   numLces;
     NvU32                   supportedPceMask;

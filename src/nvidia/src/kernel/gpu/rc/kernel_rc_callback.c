@@ -61,11 +61,26 @@ _vgpuRcResetCallback
         {
             THREAD_STATE_NODE                             threadState;
             NV506F_CTRL_CMD_RESET_ISOLATED_CHANNEL_PARAMS params = {0};
+            RsClient      *pClient;
+            KernelChannel *pKernelChannel = NULL;
 
             threadStateInitISRAndDeferredIntHandler(
                 &threadState,
                 pRcErrorContext->pGpu,
                 THREAD_STATE_FLAGS_IS_DEFERRED_INT_HANDLER);
+
+            NV_ASSERT_OK_OR_GOTO(
+                status,
+                serverGetClientUnderLock(&g_resServ, hClient, &pClient),
+                error_cleanup);
+            NV_ASSERT_OK_OR_GOTO(
+                status,
+                CliGetKernelChannel(pClient, hChannel, &pKernelChannel),
+                error_cleanup);
+ 
+            NV_ASSERT_OR_ELSE(pKernelChannel != NULL,
+                              status = NV_ERR_INVALID_STATE;
+                              goto error_cleanup);
 
             params.engineID   = pRcErrorContext->EngineId;
             params.exceptType = pRcErrorContext->exceptType;
@@ -98,6 +113,11 @@ _vgpuRcResetCallback
         status = NV_ERR_STATE_IN_USE;
     }
 
+    return status;
+
+error_cleanup:
+    rmGpuLocksRelease(GPUS_LOCK_FLAGS_NONE, NULL);
+    osReleaseRmSema(pSys->pSema, NULL);
     return status;
 }
 

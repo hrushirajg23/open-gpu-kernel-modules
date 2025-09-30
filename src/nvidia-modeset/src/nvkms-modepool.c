@@ -1714,18 +1714,27 @@ static NvBool ValidateMode(NVDpyEvoPtr pDpyEvo,
     b2Heads1Or = nvEvoUse2Heads1OR(pDpyEvo, pTimingsEvo, pParams);
 
     if (nvDpyIsHdmiEvo(pDpyEvo)) {
-        if (!nvHdmiFrlQueryConfig(pDpyEvo,
-                                  &pKmsMode->timings,
-                                  pTimingsEvo,
-                                  &dpyColor,
-                                  b2Heads1Or,
-                                  pParams,
-                                  pHdmiFrlConfig,
-                                  pDscInfo)) {
+        NvBool foundFrlConfig = FALSE;
+        do {
+            if (nvHdmiFrlQueryConfigOneColorSpaceAndBpc(pDpyEvo,
+                                                        &pKmsMode->timings,
+                                                        pTimingsEvo,
+                                                        &dpyColor,
+                                                        b2Heads1Or,
+                                                        pParams,
+                                                        pHdmiFrlConfig,
+                                                        pDscInfo)) {
+                foundFrlConfig = TRUE;
+                break; 
+            }
+        } while (nvDowngradeColorSpaceAndBpc(pDpyEvo, &supportedColorFormats, &dpyColor));
+
+        if (!foundFrlConfig) {
             LogModeValidationEnd(pDispEvo, pInfoString,
                 "Unable to determine HDMI 2.1 Fixed Rate Link configuration.");
             goto done;
         }
+
     } else {
         if (!nvDPValidateModeEvo(pDpyEvo, pTimingsEvo, &dpyColor, b2Heads1Or,
                                  pDscInfo, pParams)) {

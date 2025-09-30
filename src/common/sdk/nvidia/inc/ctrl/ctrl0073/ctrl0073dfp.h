@@ -1672,4 +1672,215 @@ typedef struct NV0073_CTRL_DFP_SET_FORCE_BLACK_PIXELS_PARAMS {
     NvBool bForceBlack;
 } NV0073_CTRL_DFP_SET_FORCE_BLACK_PIXELS_PARAMS;
 
+/*
+ * NV0073_CTRL_CMD_DFP_GET_DISP_PHY_INFO
+ *
+ * Return a high-level DISP PHY description that is independent of raw register
+ * encodings. Tools or firmware can use the information to reason about link
+ * routing and data-rate policy, etc.
+ *
+ * Parameters
+ *   subDeviceInstance (in)
+ *       Sub-device instance within NV04_DISPLAY_COMMON.
+ *
+ *   edpClkSrc     (out)  enum NV0073_CTRL_DFP_DISP_PHY_EDP_CLK_SRC
+ *   edpPllFreq    (out)  enum NV0073_CTRL_DFP_DISP_PHY_EDP_PLL_FREQ_SEL
+ *
+ *   padLink[4]    (out)  One entry per DP Pad-Link (DP0...DP3):
+ *         sorSel           enum NV0073_CTRL_DFP_DISP_PHY_DP_SOR_SEL 
+ *         mode             enum NV0073_CTRL_DFP_DISP_PHY_TYPEC_MODE
+ *         cableOrient      enum NV0073_CTRL_DFP_DISP_PHY_CABLE_ORIENT
+ *         modeStatusDone   NvBool   (Alt-mode exit / entry finished)
+ *         safeMode         enum NV0073_CTRL_DFP_DISP_PHY_TYPEC_SAFE_MODE
+ *
+ *         tpllForceVal     enum NV0073_CTRL_DFP_DISP_PHY_TPLL_FORCE_VAL
+ *         tpllForceEn      NvBool   (DA_XTP_LN_TPLL_SEL[16])
+ *         pllPwrSeqEn      NvBool   (DP_PHY_DIG_PLL_CTL_0[0])
+ *         pllPwrSeqState   enum NV0073_CTRL_DFP_DISP_PHY_PLL_PWR_STATE
+ *         bitRateSel       enum NV0073_CTRL_DFP_DISP_PHY_DP_BIT_RATE_SEL
+ *         pdCableIdA       NV0073_CTRL_DFP_DISP_PHY_PD_CABLE_ID_A_INFO
+ *                           structured view of TOP_TYPEC_IPMUX_PD_CABLE_ID_A
+ *                            (DP-rate capability, pin sets, UHBR13.5 support,
+ *                             active component type, DP-AM version, ...)
+ *
+ *         pdCableIdB       NV0073_CTRL_DFP_DISP_PHY_PD_CABLE_ID_B_INFO
+ *                           structured view of TOP_TYPEC_IPMUX_PD_CABLE_ID_B
+ *                            (VCONN source indication)
+ *
+ * Status values
+ *   NV_OK
+ *   NV_ERR_INVALID_ARGUMENT     invalid subDeviceInstance
+ *   NV_ERR_NOT_SUPPORTED        device doesn't have a display
+ */
+
+#define NV0073_CTRL_DFP_DISP_DP_PADLINK_COUNT 4U
+
+// eDP clock source selection (EDP_PHY_DIG_MISC[3:0])
+typedef enum NV0073_CTRL_DFP_DISP_PHY_EDP_CLK_SRC {
+    NV0073_CTRL_DFP_DISP_PHY_EDP_CLK_SRC_NONE = 0,
+    NV0073_CTRL_DFP_DISP_PHY_EDP_CLK_SRC_SOR0 = 1,
+    NV0073_CTRL_DFP_DISP_PHY_EDP_CLK_SRC_SOR1 = 2,
+    NV0073_CTRL_DFP_DISP_PHY_EDP_CLK_SRC_SOR2 = 4,
+    NV0073_CTRL_DFP_DISP_PHY_EDP_CLK_SRC_SOR3 = 8,
+} NV0073_CTRL_DFP_DISP_PHY_EDP_CLK_SRC;
+
+// eDP PLL frequency selector (EDP_PHY_DIG_BIT_RATE[3:0])
+typedef enum NV0073_CTRL_DFP_DISP_PHY_EDP_PLL_FREQ_SEL {
+    NV0073_CTRL_DFP_DISP_PHY_EDP_PLL_FREQ_1_62GHZ = 1,
+    NV0073_CTRL_DFP_DISP_PHY_EDP_PLL_FREQ_2_16GHZ = 2,
+    NV0073_CTRL_DFP_DISP_PHY_EDP_PLL_FREQ_2_43GHZ = 3,
+    NV0073_CTRL_DFP_DISP_PHY_EDP_PLL_FREQ_2_70GHZ = 4,
+    NV0073_CTRL_DFP_DISP_PHY_EDP_PLL_FREQ_3_24GHZ = 5,
+    NV0073_CTRL_DFP_DISP_PHY_EDP_PLL_FREQ_4_32GHZ = 6,
+    NV0073_CTRL_DFP_DISP_PHY_EDP_PLL_FREQ_5_40GHZ = 7,
+    NV0073_CTRL_DFP_DISP_PHY_EDP_PLL_FREQ_6_75GHZ = 8,
+    NV0073_CTRL_DFP_DISP_PHY_EDP_PLL_FREQ_8_10GHZ = 9,
+} NV0073_CTRL_DFP_DISP_PHY_EDP_PLL_FREQ_SEL;
+
+// DP bit-rate selector (DP_PHY_DIG_BIT_RATE[2:0])
+typedef enum NV0073_CTRL_DFP_DISP_PHY_DP_BIT_RATE_SEL {
+    NV0073_CTRL_DFP_DISP_PHY_DP_BIT_RATE_1_62GHZ = 0,
+    NV0073_CTRL_DFP_DISP_PHY_DP_BIT_RATE_2_70GHZ = 1,
+    NV0073_CTRL_DFP_DISP_PHY_DP_BIT_RATE_5_40GHZ = 2,
+    NV0073_CTRL_DFP_DISP_PHY_DP_BIT_RATE_8_10GHZ = 3,
+    NV0073_CTRL_DFP_DISP_PHY_DP_BIT_RATE_10_00GHZ = 4,
+    NV0073_CTRL_DFP_DISP_PHY_DP_BIT_RATE_13_50GHZ = 5,
+    NV0073_CTRL_DFP_DISP_PHY_DP_BIT_RATE_20_00GHZ = 6,
+} NV0073_CTRL_DFP_DISP_PHY_DP_BIT_RATE_SEL;
+
+// DP_PHY_DIG_MISC[3:0]
+typedef enum NV0073_CTRL_DFP_DISP_PHY_DP_SOR_SEL {
+    NV0073_CTRL_DFP_DISP_PHY_DP_SOR_SEL_NONE = 0,
+    NV0073_CTRL_DFP_DISP_PHY_DP_SOR_SEL_SOR0 = 1,
+    NV0073_CTRL_DFP_DISP_PHY_DP_SOR_SEL_SOR1 = 2,
+    NV0073_CTRL_DFP_DISP_PHY_DP_SOR_SEL_SOR2 = 3,
+    NV0073_CTRL_DFP_DISP_PHY_DP_SOR_SEL_SOR3 = 4,
+} NV0073_CTRL_DFP_DISP_PHY_DP_SOR_SEL;
+
+// Type-C mux operating mode (TOP_TYPEC_IPMUX_CTRL[1:0])
+typedef enum NV0073_CTRL_DFP_DISP_PHY_TYPEC_MODE {
+    NV0073_CTRL_DFP_DISP_PHY_TYPEC_MODE_USB4_2T2R = 0,
+    NV0073_CTRL_DFP_DISP_PHY_TYPEC_MODE_USB3_2T2R = 1,
+    NV0073_CTRL_DFP_DISP_PHY_TYPEC_MODE_DP_4T = 2,
+    NV0073_CTRL_DFP_DISP_PHY_TYPEC_MODE_DP_2T_USB3_1T1R = 3,
+} NV0073_CTRL_DFP_DISP_PHY_TYPEC_MODE;
+
+// Cable orientation (TOP_TYPEC_IPMUX_CTRL[2])
+typedef enum NV0073_CTRL_DFP_DISP_PHY_CABLE_ORIENT {
+    NV0073_CTRL_DFP_DISP_PHY_ORIENT_UNFLIPPED = 0,
+    NV0073_CTRL_DFP_DISP_PHY_ORIENT_FLIPPED = 1,
+} NV0073_CTRL_DFP_DISP_PHY_CABLE_ORIENT;
+
+// Safe-mode control (TOP_TYPEC_IPMUX_CTRL[3])
+typedef enum NV0073_CTRL_DFP_DISP_PHY_TYPEC_SAFE_MODE {
+    NV0073_CTRL_DFP_DISP_PHY_TYPEC_SAFE_MODE_ENABLED = 0,   // IP-MUX held in Safe-Mode
+    NV0073_CTRL_DFP_DISP_PHY_TYPEC_SAFE_MODE_ALT = 1,       // Safe-Mode disabled so Alt-Mode allowed
+} NV0073_CTRL_DFP_DISP_PHY_TYPEC_SAFE_MODE;
+
+// TPLL force-value codes (DA_XTP_LN_TPLL_SEL[15:8])
+typedef enum NV0073_CTRL_DFP_DISP_PHY_TPLL_FORCE_VAL {
+    NV0073_CTRL_DFP_DISP_PHY_TPLL_FORCE_RBR_UHBR13_5 = 57,  // RBR / UHBR13.5
+    NV0073_CTRL_DFP_DISP_PHY_TPLL_FORCE_HBR_HBR2 = 89,      // HBR / HBR2
+    NV0073_CTRL_DFP_DISP_PHY_TPLL_FORCE_HBR3 = 121,          // HBR3
+    NV0073_CTRL_DFP_DISP_PHY_TPLL_FORCE_UHBR10_UHBR20 = 26,  // UHBR10 / UHBR20
+} NV0073_CTRL_DFP_DISP_PHY_TPLL_FORCE_VAL;
+
+// PLL power-sequence state (DP_PHY_DIG_PLL_CTL_0[2:1])
+typedef enum NV0073_CTRL_DFP_DISP_PHY_PLL_PWR_STATE {
+    NV0073_CTRL_DFP_DISP_PHY_PLL_STATE_PD = 0,
+    NV0073_CTRL_DFP_DISP_PHY_PLL_STATE_BIAS_ON = 1,
+    NV0073_CTRL_DFP_DISP_PHY_PLL_STATE_PLL_ON = 2,
+    NV0073_CTRL_DFP_DISP_PHY_PLL_STATE_LANE_ON = 3,
+} NV0073_CTRL_DFP_DISP_PHY_PLL_PWR_STATE;
+
+// Supported DisplayPort data-rate capability (bits 5:2)
+typedef enum NV0073_CTRL_DFP_DISP_PHY_PD_CBL_DP_PROT {
+    NV0073_CTRL_DFP_DISP_PHY_PD_CBL_DP_PROT_NONE = 0,
+    NV0073_CTRL_DFP_DISP_PHY_PD_CBL_DP_PROT_UPTO_HBR3 = 1,
+    NV0073_CTRL_DFP_DISP_PHY_PD_CBL_DP_PROT_UHBR10_0 = 2,
+    NV0073_CTRL_DFP_DISP_PHY_PD_CBL_DP_PROT_UPTO_UHBR10_0 = 3,
+    NV0073_CTRL_DFP_DISP_PHY_PD_CBL_DP_PROT_UHBR20_0 = 4,
+    NV0073_CTRL_DFP_DISP_PHY_PD_CBL_DP_PROT_UPTO_HBR3_UHBR20_0 = 5,
+    NV0073_CTRL_DFP_DISP_PHY_PD_CBL_DP_PROT_UHBR10_0_UHBR20_0 = 6,
+    NV0073_CTRL_DFP_DISP_PHY_PD_CBL_DP_PROT_UPTO_UHBR20_0 = 7,
+} NV0073_CTRL_DFP_DISP_PHY_PD_CBL_DP_PROT;
+
+// SRC / SINK pin-sets advertised by the cable (bits 15:8 / 23:16)
+typedef enum NV0073_CTRL_DFP_DISP_PHY_PD_CBL_PIN_CAP {
+    NV0073_CTRL_DFP_DISP_PHY_PD_CBL_PIN_CD = 12,
+    NV0073_CTRL_DFP_DISP_PHY_PD_CBL_PIN_E = 16,
+} NV0073_CTRL_DFP_DISP_PHY_PD_CBL_PIN_CAP;
+
+// UHBR13.5 support is Boolean, using NvBool
+
+// Active-component type (bits 29:28)
+typedef enum NV0073_CTRL_DFP_DISP_PHY_PD_CBL_ACTIVE_COMP {
+    NV0073_CTRL_DFP_DISP_PHY_PD_CBL_ACTIVE_PASSIVE = 0,
+    NV0073_CTRL_DFP_DISP_PHY_PD_CBL_ACTIVE_RETIMER = 1,
+    NV0073_CTRL_DFP_DISP_PHY_PD_CBL_ACTIVE_REDRIVER = 2,
+    NV0073_CTRL_DFP_DISP_PHY_PD_CBL_ACTIVE_OPTICAL = 3,
+} NV0073_CTRL_DFP_DISP_PHY_PD_CBL_ACTIVE_COMP;
+
+// DP Alt-Mode version supported by the cable (bits 31:30)
+typedef enum NV0073_CTRL_DFP_DISP_PHY_PD_CBL_DPAM_VERS {
+    NV0073_CTRL_DFP_DISP_PHY_PD_CBL_DPAM_VERS_UPTO_2_0 = 0,
+    NV0073_CTRL_DFP_DISP_PHY_PD_CBL_DPAM_VERS_2_1_OR_LATER = 1,
+} NV0073_CTRL_DFP_DISP_PHY_PD_CBL_DPAM_VERS;
+
+// VCONN source indication (Cable-ID-B bit 0)
+typedef enum NV0073_CTRL_DFP_DISP_PHY_PD_CBL_VCONN_SRC {
+    NV0073_CTRL_DFP_DISP_PHY_PD_CBL_VCONN_SRC_DPTX = 0,
+    NV0073_CTRL_DFP_DISP_PHY_PD_CBL_VCONN_SRC_DPRX = 1,
+} NV0073_CTRL_DFP_DISP_PHY_PD_CBL_VCONN_SRC;
+
+typedef struct NV0073_CTRL_DFP_DISP_PHY_PD_CABLE_ID_A_INFO {
+    NV0073_CTRL_DFP_DISP_PHY_PD_CBL_DP_PROT     dpProt;
+    NV0073_CTRL_DFP_DISP_PHY_PD_CBL_PIN_CAP     srcPinSet;
+    NV0073_CTRL_DFP_DISP_PHY_PD_CBL_PIN_CAP     sinkPinSet;
+    NvBool                                      bUhbr13_5;                          // bit 26
+    NV0073_CTRL_DFP_DISP_PHY_PD_CBL_ACTIVE_COMP activeComp;  // bits 29:28
+    NV0073_CTRL_DFP_DISP_PHY_PD_CBL_DPAM_VERS   dpamVers;    // bits 31:30
+} NV0073_CTRL_DFP_DISP_PHY_PD_CABLE_ID_A_INFO;
+
+typedef struct NV0073_CTRL_DFP_DISP_PHY_PD_CABLE_ID_B_INFO {
+    NV0073_CTRL_DFP_DISP_PHY_PD_CBL_VCONN_SRC vconnSrc;    // bit 0
+} NV0073_CTRL_DFP_DISP_PHY_PD_CABLE_ID_B_INFO;
+
+typedef struct NV0073_CTRL_DFP_DISP_PHY_PADLINK_INFO {
+    // SOR routing
+    NV0073_CTRL_DFP_DISP_PHY_DP_SOR_SEL         sorSel;
+
+    // Type-C mux status
+    NV0073_CTRL_DFP_DISP_PHY_TYPEC_MODE         mode; // USB4_2T2R, etc
+    NV0073_CTRL_DFP_DISP_PHY_CABLE_ORIENT       cableOrient;
+    NvBool                                      bModeStatusDone; // Type-C IP-MUX has finished its mode-change power-down / power-up sequence when entering or exiting an alternate mode
+    NV0073_CTRL_DFP_DISP_PHY_TYPEC_SAFE_MODE    safeMode;
+
+    // Data-rate / PLL settings
+    NV0073_CTRL_DFP_DISP_PHY_TPLL_FORCE_VAL     tpllForceVal;
+    NvBool                                      bTpllForceEn; // 0 = let hardware pick the appropriate TPLL settings automatically, 1 = force the TPLL to use tpllForceVal.
+    NvBool                                      bPllPwrSeqEn; // 0 = normal automatic power-sequencer operation, 1 = override; the PHY obeys the explicit power state given in pllPwrSeqState.
+    NV0073_CTRL_DFP_DISP_PHY_PLL_PWR_STATE      pllPwrSeqState;
+    NV0073_CTRL_DFP_DISP_PHY_DP_BIT_RATE_SEL    bitRateSel;
+
+    // USB-PD cable identification
+    NV0073_CTRL_DFP_DISP_PHY_PD_CABLE_ID_A_INFO pdCableIdA;
+    NV0073_CTRL_DFP_DISP_PHY_PD_CABLE_ID_B_INFO pdCableIdB;
+} NV0073_CTRL_DFP_DISP_PHY_PADLINK_INFO;
+
+#define NV0073_CTRL_CMD_DFP_GET_DISP_PHY_INFO (0x731180U) /* finn: Evaluated from "(FINN_NV04_DISPLAY_COMMON_DFP_INTERFACE_ID << 8) | NV0073_CTRL_DFP_GET_DISP_PHY_INFO_PARAMS_MESSAGE_ID" */
+
+#define NV0073_CTRL_DFP_GET_DISP_PHY_INFO_PARAMS_MESSAGE_ID (0x80U)
+
+typedef struct NV0073_CTRL_DFP_GET_DISP_PHY_INFO_PARAMS {
+    NvU32                                     subDeviceInstance;
+
+    // eDP-wide settings
+    NV0073_CTRL_DFP_DISP_PHY_EDP_CLK_SRC      edpClkSrc;
+    NV0073_CTRL_DFP_DISP_PHY_EDP_PLL_FREQ_SEL edpPllFreq;
+
+    // Per-Pad-Link (DP0...DP3) information
+    NV0073_CTRL_DFP_DISP_PHY_PADLINK_INFO     padLink[NV0073_CTRL_DFP_DISP_DP_PADLINK_COUNT];
+} NV0073_CTRL_DFP_GET_DISP_PHY_INFO_PARAMS;
+
 /* _ctrl0073dfp_h_ */

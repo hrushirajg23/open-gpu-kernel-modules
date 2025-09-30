@@ -114,6 +114,10 @@ MODULE_PARM_DESC(fail_alloc_core_channel, "Control testing for hardware core cha
 static int fail_alloc_core_channel_method = -1;
 module_param_named(fail_alloc_core_channel, fail_alloc_core_channel_method, int, 0400);
 
+MODULE_PARM_DESC(debug, "Enable debug logging");
+static int debug = 0;
+module_param_named(debug, debug, int, 0600);
+
 #if NVKMS_CONFIG_FILE_SUPPORTED
 /* This parameter is used to find the dpy override conf file */
 #define NVKMS_CONF_FILE_SPECIFIED (nvkms_conf != NULL)
@@ -188,6 +192,11 @@ enum NvKmsDebugForceColorSpace nvkms_debug_force_color_space(void)
 NvBool nvkms_enable_overlay_layers(void)
 {
     return enable_overlay_layers;
+}
+
+NvBool nvkms_debug_logging(void)
+{
+    return debug != 0;
 }
 
 NvBool nvkms_kernel_supports_syncpts(void)

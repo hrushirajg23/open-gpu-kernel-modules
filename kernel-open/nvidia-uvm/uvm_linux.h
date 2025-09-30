@@ -85,6 +85,12 @@
 
     #define UVM_THREAD_AFFINITY_SUPPORTED() 1
 
+    #if defined(CONFIG_ZONE_DEVICE) && defined(NV_MEMORY_DEVICE_COHERENT_PRESENT)
+        #define UVM_CDMM_PAGES_SUPPORTED() 1
+    #else
+        #define UVM_CDMM_PAGES_SUPPORTED() 0
+    #endif
+
     #if defined(CONFIG_HMM_MIRROR) && defined(CONFIG_DEVICE_PRIVATE) && defined(NV_MIGRATE_DEVICE_RANGE_PRESENT)
         #define UVM_IS_CONFIG_HMM() 1
     #else

@@ -801,3 +801,14 @@ void nvDebugAssert(const char *expString, const char *filenameString,
 }
 
 #endif /* DEBUG */
+
+NvBool nvDoDebugLogging(void)
+{
+#if defined(DEBUG)
+    /* Always do debug logging in debug builds. */
+    return TRUE;
+#endif
+
+    /* Otherwise, do debug logging if the kernel module is enabled. */
+    return nvkms_debug_logging();
+}

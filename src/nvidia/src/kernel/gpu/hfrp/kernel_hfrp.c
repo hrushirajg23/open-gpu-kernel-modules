@@ -149,10 +149,10 @@ NV_STATUS
 khfrpMailboxDequeueMessage_IMPL
 (
     KernelHFRP *pKernelHfrp,
-    NvU32      *pMessageHeader,
-    NvU8       *pPayloadArray,
-    NvU32      *pPayloadSize,
-    NvU32       mailboxFlag
+    NvU32 *pMessageHeader,
+    NvU8 *pPayloadArray,
+    NvU32 *pPayloadSize,
+    NvU32 mailboxFlag
 )
 {
     NvU32 tailAddr;
@@ -160,17 +160,14 @@ khfrpMailboxDequeueMessage_IMPL
     NvU32 hfrpBufferEndAddr;
     NvU32 hfrpHeadPtrAddr;
     NvU32 hfrpTailPtrAddr;
-    NvU32 clientPayloadSize;
-    NvU32 sequenceId;
-    NvU8  messageSize;
-    NvU8  payloadSize;
-    NvU8  head;
-    NvU8  tail;
+    NvU32 bufferSizeUsed;
+    NvU32 mailboxBufferSize;
+    NvU8 messageSize;
+    NvU8 payloadSize;
+    NvU8 head;
+    NvU8 tail;
     NV_STATUS status = NV_OK;
-
     HFRP_MAILBOX_IO_INFO *pMailboxIoInfo = &(pKernelHfrp->khfrpInfo.mailboxIoInfo);
-    HFRP_SEQUENCEID_INFO *pSequenceIdInfo = &(pKernelHfrp->khfrpInfo.sequenceIdInfo);
-
     if (mailboxFlag == HFRP_COMMAND_MAILBOX_FLAG)
     {
         hfrpBufferStartAddr = pMailboxIoInfo->hfrpCommandBufferStartAddr;
@@ -187,43 +184,46 @@ khfrpMailboxDequeueMessage_IMPL
     }
     head = _hfrpReadByte(pKernelHfrp, hfrpHeadPtrAddr);
     tail = _hfrpReadByte(pKernelHfrp, hfrpTailPtrAddr);
+    mailboxBufferSize = hfrpBufferEndAddr - hfrpBufferStartAddr + 1U;
+    if ((tail >= mailboxBufferSize) || (head >= mailboxBufferSize))
+    {
+        NV_PRINTF(LEVEL_ERROR,
+                  "Invalid state: head (%u) or tail (%u) pointer is out of range\n",
+                  head, tail);
+        return NV_ERR_INVALID_STATE;
+    }
     if (head == tail)
     {
-        return NV_ERR_GENERIC;
+        NV_PRINTF(LEVEL_INFO,
+                  "Buffer empty: head (%u) == tail (%u)\n", head, tail);
+        return NV_ERR_BUFFER_EMPTY;
     }
 
     tailAddr = tail + hfrpBufferStartAddr;
-    tailAddr = _hfrpReadMailboxData(pKernelHfrp, (NvU8 *)pMessageHeader, HFRP_MESSAGE_HEADER_BYTE_SIZE, tailAddr);
+    tailAddr = _hfrpReadMailboxData(pKernelHfrp, (NvU8 *)pMessageHeader,
+                                    HFRP_MESSAGE_HEADER_BYTE_SIZE, tailAddr);
     messageSize = REF_VAL(HFRP_MESSAGE_FIELD_SIZE, *pMessageHeader);
-    sequenceId = REF_VAL(HFRP_MESSAGE_FIELD_SEQUENCE_ID, *pMessageHeader);
     payloadSize = messageSize - HFRP_MESSAGE_HEADER_BYTE_SIZE;
+    bufferSizeUsed = (mailboxBufferSize + head - tail) % mailboxBufferSize;
+    if (bufferSizeUsed < messageSize)
+    {
+        NV_PRINTF(LEVEL_ERROR,
+                  "Invalid state: buffer size used (%u) < message size (%u)\n",
+                  bufferSizeUsed, messageSize);
+        return NV_ERR_INVALID_STATE;
+    }
 
-    if (sequenceId == HFRP_ASYNC_NOTIFICATION_SEQUENCEID_INDEX)
-    {
-        clientPayloadSize = HFRP_MAX_PAYLOAD_SIZE;
-    }
-    else
-    {
-        // Update response payload size parameter
-        NvU32 *pResponsePayloadSize = pSequenceIdInfo->pResponsePayloadSizeArray[sequenceId];
-        clientPayloadSize = *pResponsePayloadSize;
-        *pResponsePayloadSize = payloadSize;
-    }
-    if ((payloadSize > HFRP_MAX_PAYLOAD_SIZE) || (payloadSize > clientPayloadSize))
+    if (payloadSize > HFRP_MAX_PAYLOAD_SIZE)
     {
         tailAddr += payloadSize;
         if (tailAddr > hfrpBufferEndAddr)
         {
             tailAddr -= (hfrpBufferEndAddr - hfrpBufferStartAddr + 1U);
         }
-        if (payloadSize > HFRP_MAX_PAYLOAD_SIZE)
-        {
-            status = NV_ERR_INSUFFICIENT_RESOURCES;
-        }
-        else
-        {
-            status = NV_ERR_BUFFER_TOO_SMALL;
-        }
+        NV_PRINTF(LEVEL_ERROR,
+                  "payload size (%u) > Maximum allowed payload size (%u)\n",
+                  payloadSize, HFRP_MAX_PAYLOAD_SIZE);
+        status = NV_ERR_INSUFFICIENT_RESOURCES;
     }
     else
     {
@@ -235,7 +235,7 @@ khfrpMailboxDequeueMessage_IMPL
     return status;
 }
 
-void
+NV_STATUS
 khfrpProcessResponse_IMPL
 (
     KernelHFRP *pKernelHfrp
@@ -250,67 +250,132 @@ khfrpProcessResponse_IMPL
         NvU16 responseStatus;
         NvU8 response[HFRP_MAX_PAYLOAD_SIZE];
 
-        status = khfrpMailboxDequeueMessage_IMPL(pKernelHfrp, &responseHeader, response,
-            &responseSize, HFRP_RESPONSE_MAILBOX_FLAG);
-        if (status == NV_ERR_GENERIC)
-        {
-            return;
-        }
-
+        status = khfrpMailboxDequeueMessage_IMPL(pKernelHfrp, &responseHeader,
+            response, &responseSize, HFRP_RESPONSE_MAILBOX_FLAG);
         if (status == NV_ERR_BUFFER_EMPTY)
         {
-            return;
+            return NV_OK;
         }
-
-        responseSequenceId = REF_VAL(HFRP_MESSAGE_FIELD_SEQUENCE_ID, responseHeader);
-        responseStatus = REF_VAL(HFRP_MESSAGE_FIELD_INDEX_OR_STATUS, responseHeader);
+        if (status == NV_ERR_INVALID_STATE)
+        {
+            return NV_ERR_INVALID_STATE;
+        }
+        responseSequenceId = REF_VAL(HFRP_MESSAGE_FIELD_SEQUENCE_ID,
+                                     responseHeader);
+        responseStatus = REF_VAL(HFRP_MESSAGE_FIELD_INDEX_OR_STATUS,
+                                 responseHeader);
         if (responseSequenceId == HFRP_ASYNC_NOTIFICATION_SEQUENCEID_INDEX)
         {
-            // pKernelHfrp->asyncRegisteredFunction(&response, responseStatus);
+            // Bug 5038815: to add async function special handling.
         }
         else
         {
-            // The sequence id of the response received invalid (not in accepted range)
-            if (responseSequenceId >= HFRP_NUMBER_OF_SEQUENCEID_INDEX)
-            {
-                continue;
-            }
-            // The sequence id of the response is not allocated for any command
-            if (khfrpIsSequenceIdFree_IMPL(pKernelHfrp, responseSequenceId))
-            {
-                continue;
-            }
             HFRP_SEQUENCEID_INFO *pSequenceIdInfo = &(pKernelHfrp->khfrpInfo.sequenceIdInfo);
             NvU16 *pResponseStatus = pSequenceIdInfo->pResponseStatusArray[responseSequenceId];
             NV_STATUS *pStatus = pSequenceIdInfo->pStatusArray[responseSequenceId];
-           *pStatus = status;
-            NvU8 *pResponse;
-            *pResponseStatus = responseStatus;
-            pResponse = pSequenceIdInfo->pResponsePayloadArray[responseSequenceId];
+            NvU8 *pResponse = pSequenceIdInfo->pResponsePayloadArray[responseSequenceId];
+            NvU32 *pResponsePayloadSize = pSequenceIdInfo->pResponsePayloadSizeArray[responseSequenceId];
+            NvU32 clientPayloadSize;
 
-            if (status == NV_OK)
+            // The sequence id of the response received invalid (not in accepted range)
+            if (responseSequenceId >= HFRP_NUMBER_OF_SEQUENCEID_INDEX)
             {
-                for (NvU32 i = 0U; i < responseSize; i++)
+                NV_PRINTF(LEVEL_ERROR,
+                          "Invalid state: sequence id (%u) is not in accepted range\n",
+                          responseSequenceId);
+                return NV_ERR_INVALID_STATE;
+                continue;
+            }
+
+            if (khfrpIsSequenceIdFree_IMPL(pKernelHfrp, responseSequenceId))
+            {
+                NV_PRINTF(LEVEL_ERROR,
+                          "Invalid state: sequence id (%u) is not allocated for any command\n",
+                          responseSequenceId);
+                return NV_ERR_INVALID_STATE;
+            }
+
+            if (pResponseStatus != NULL)
+            {
+                *pResponseStatus = responseStatus;
+            }
+            else
+            {
+                NV_PRINTF(LEVEL_ERROR,
+                          "Invalid state: response status pointer is not allocated\n");
+                return NV_ERR_INVALID_STATE;
+            }
+            if (pStatus != NULL)
+            {
+                *pStatus = status;
+            }
+            else
+            {
+                NV_PRINTF(LEVEL_ERROR,
+                          "Invalid state: status pointer is not allocated\n");
+                return NV_ERR_INVALID_STATE;
+            }
+
+            if (pResponsePayloadSize != NULL)
+            {
+                clientPayloadSize = *pResponsePayloadSize;
+                *pResponsePayloadSize = responseSize;
+                if (responseSize > clientPayloadSize)
                 {
-                    pResponse[i] = response[i];
+                    NV_PRINTF(LEVEL_ERROR,
+                              "Invalid state: response size (%u) > client payload size (%u)\n",
+                              responseSize, clientPayloadSize);
+                    status = NV_ERR_BUFFER_TOO_SMALL;
                 }
             }
-            khfrpFreeSequenceId_IMPL(pKernelHfrp, responseSequenceId);
+            else
+            {
+                NV_PRINTF(LEVEL_ERROR,
+                          "Invalid state: response payload size pointer is not allocated\n");
+                return NV_ERR_INVALID_STATE;
+            }
+
+            if (pResponse != NULL)
+            {
+                if (status == NV_OK)
+                {
+                    for (NvU32 i = 0U; i < responseSize; i++)
+                    {
+                        pResponse[i] = response[i];
+                    }
+                }
+            }
+            khfrpFreeSequenceId(pKernelHfrp, responseSequenceId);
         }
     }
+    return NV_OK;
 }
 
-void
+NV_STATUS
 khfrpServiceEvent_IMPL
 (
     KernelHFRP *pKernelHfrp
 )
 {
     HFRP_MAILBOX_IO_INFO *pMailboxIoInfo = &(pKernelHfrp->khfrpInfo.mailboxIoInfo);
-    khfrpProcessResponse_IMPL(pKernelHfrp);
-    khfrpWriteBit_IMPL(pKernelHfrp, pMailboxIoInfo->hfrpIrqOutClrAddr, HFRP_IRQ_DOORBELL_BIT_INDEX, 1U);
-    // processing the response again since the response maybe queued after writing IRQ_OUT_CLR
-    khfrpProcessResponse_IMPL(pKernelHfrp);
+    NV_STATUS status;
+    status = khfrpProcessResponse_IMPL(pKernelHfrp);
+    if (status == NV_ERR_INVALID_STATE)
+    {
+        return status;
+    }
+    khfrpWriteBit_IMPL(pKernelHfrp, pMailboxIoInfo->hfrpIrqOutClrAddr,
+                    HFRP_IRQ_DOORBELL_BIT_INDEX, 1U);
+    //
+    // processing the response again since the response maybe queued after
+    // writing IRQ_OUT_CLR
+    //
+    status = khfrpProcessResponse_IMPL(pKernelHfrp);
+    if (status == NV_ERR_INVALID_STATE)
+    {
+        return status;
+    }
+    return NV_OK;
 }
 
 NV_STATUS
@@ -523,22 +588,22 @@ NV_STATUS
 khfrpMailboxQueueMessage_IMPL
 (
     KernelHFRP *pKernelHfrp,
-    NvU32       messageHeader,
-    NvU8       *pPayloadArray,
-    NvU32       payloadSize,
-    NvU32       mailboxFlag
+    NvU32 messageHeader,
+    NvU8 *pPayloadArray,
+    NvU32 payloadSize,
+    NvU32 mailboxFlag
 )
 {
     NvU32 headAddr;
-    NvU32 hfrpBufferStartAddr = 0;
-    NvU32 hfrpBufferEndAddr = 0;
-    NvU32 hfrpHeadPtrAddr = 0 ;
-    NvU32 hfrpTailPtrAddr = 0;
-    NvU32 mailboxBufferSize = 0;
+    NvU32 hfrpBufferStartAddr;
+    NvU32 hfrpBufferEndAddr;
+    NvU32 hfrpHeadPtrAddr;
+    NvU32 hfrpTailPtrAddr;
+    NvU32 mailboxBufferSize;
     NvU8 head;
     NvU8 tail;
+    NvU32 bufferSizeUsed;
     HFRP_MAILBOX_IO_INFO *pMailboxIoInfo = &(pKernelHfrp->khfrpInfo.mailboxIoInfo);
-
     if (mailboxFlag == HFRP_COMMAND_MAILBOX_FLAG)
     {
         hfrpBufferStartAddr = pMailboxIoInfo->hfrpCommandBufferStartAddr;
@@ -553,19 +618,32 @@ khfrpMailboxQueueMessage_IMPL
         hfrpHeadPtrAddr = pMailboxIoInfo->hfrpResponseBufferHeadPtrAddr;
         hfrpTailPtrAddr = pMailboxIoInfo->hfrpResponseBufferTailPtrAddr;
     }
-
     mailboxBufferSize = hfrpBufferEndAddr - hfrpBufferStartAddr + 1U;
     head = _hfrpReadByte(pKernelHfrp, hfrpHeadPtrAddr);
     tail = _hfrpReadByte(pKernelHfrp, hfrpTailPtrAddr);
-    NvU32 bufferSizeUsed = (mailboxBufferSize + head - tail) % mailboxBufferSize;
-    if ((bufferSizeUsed + payloadSize + HFRP_MESSAGE_HEADER_BYTE_SIZE) >= mailboxBufferSize)
+
+    if ((tail >= mailboxBufferSize) || (head >= mailboxBufferSize))
     {
-        return NV_ERR_GENERIC;
+        NV_PRINTF(LEVEL_ERROR, "Invalid state: head (%u) or tail (%u) pointer is out of range\n",
+                  head, tail);
+        return NV_ERR_INVALID_STATE;
+    }
+
+    bufferSizeUsed = (mailboxBufferSize + head - tail) % mailboxBufferSize;
+    if ((bufferSizeUsed + payloadSize + HFRP_MESSAGE_HEADER_BYTE_SIZE) >=
+        mailboxBufferSize)
+    {
+        NV_PRINTF(LEVEL_INFO,
+                  "Buffer full: buffer size used (%u) + payload size (%u) + header size (%u) >= mailbox buffer size (%u)\n",
+                  bufferSizeUsed, payloadSize, HFRP_MESSAGE_HEADER_BYTE_SIZE, mailboxBufferSize);
+        return NV_ERR_BUFFER_FULL;
     }
 
     headAddr = head + hfrpBufferStartAddr;
-    headAddr = _hfrpWriteMailboxData(pKernelHfrp, (NvU8 *)&messageHeader, HFRP_MESSAGE_HEADER_BYTE_SIZE, headAddr);
-    headAddr = _hfrpWriteMailboxData(pKernelHfrp, pPayloadArray, payloadSize, headAddr);
+    headAddr = _hfrpWriteMailboxData(pKernelHfrp, (NvU8 *)&messageHeader,
+                                     HFRP_MESSAGE_HEADER_BYTE_SIZE, headAddr);
+    headAddr = _hfrpWriteMailboxData(pKernelHfrp, pPayloadArray, payloadSize,
+                                     headAddr);
     head = headAddr - hfrpBufferStartAddr;
     _hfrpWriteByte(pKernelHfrp, hfrpHeadPtrAddr, head);
     return NV_OK;
@@ -575,11 +653,11 @@ NV_STATUS
 khfrpAllocateSequenceId_IMPL
 (
     KernelHFRP *pKernelHfrp,
-    NvU16      *pResponseStatus,
-    void       *pResponsePayload,
-    NvU32      *pResponsePayloadSize,
-    NV_STATUS  *pStatus,
-    NvU32      *pSequenceIdIndex
+    NvU16 *pResponseStatus,
+    void *pResponsePayload,
+    NvU32 *pResponsePayloadSize,
+    NV_STATUS *pStatus,
+    NvU32 *pSequenceIdIndex
 )
 {
     HFRP_SEQUENCEID_INFO *pSequenceIdInfo = &(pKernelHfrp->khfrpInfo.sequenceIdInfo);
@@ -612,14 +690,13 @@ khfrpAllocateSequenceId_IMPL
         pSequenceIdInfo->pStatusArray[sequenceIdIndex] = pStatus;
         break;
     }
-
     *pSequenceIdIndex = sequenceIdIndex;
-
     if (sequenceIdIndex == HFRP_NUMBER_OF_SEQUENCEID_INDEX)
     {
+        NV_PRINTF(LEVEL_INFO,
+                  "Could not allocate a sequence id to the command\n");
         return NV_ERR_IN_USE;
     }
-
     return NV_OK;
 }
 
@@ -627,7 +704,7 @@ void
 khfrpFreeSequenceId_IMPL
 (
     KernelHFRP *pKernelHfrp,
-    NvU32       index
+    NvU32 index
 )
 {
     NvU32 arrayIndex = index / 32U;
@@ -648,7 +725,13 @@ khfrpIsSequenceIdFree_IMPL
 )
 {
     HFRP_SEQUENCEID_INFO *pSequenceIdInfo = &(pKernelHfrp->khfrpInfo.sequenceIdInfo);
-    return pSequenceIdInfo->pResponseStatusArray[index] == NULL;
+    NvU32 arrayIndex = index / 32U;
+    NvU32 bitIndex = index % 32U;
+    if ((pSequenceIdInfo->sequenceIdState[arrayIndex] & (1U << bitIndex)) == 0U)
+    {
+        return NV_TRUE;
+    }
+    return NV_FALSE;
 }
 
 NV_STATUS
@@ -696,14 +779,14 @@ khfrpPostCommandBlocking_IMPL
     NvU32       commandPayloadSize,
     NvU16      *pResponseStatus,
     void       *pResponsePayload,
-    NvU32      *pResponsePayloadSize,
-    NV_STATUS  *pStatus
+    NvU32      *pResponsePayloadSize
 )
 {
     NvU32 sequenceId;
     NvU32 commandHeader;
     HFRP_MAILBOX_IO_INFO *pMailboxIoInfo;
     NV_STATUS status;
+    NV_STATUS status1;
 
     if (pKernelHfrp->getProperty(pKernelHfrp, PDB_PROP_KHFRP_IS_ENABLED) == NV_FALSE)
     {
@@ -711,53 +794,52 @@ khfrpPostCommandBlocking_IMPL
         return NV_ERR_FEATURE_NOT_ENABLED;
     }
 
-    commandHeader = FLD_SET_REF_NUM(HFRP_MESSAGE_FIELD_SIZE, commandPayloadSize + HFRP_MESSAGE_HEADER_BYTE_SIZE, 0U);
+    commandHeader = FLD_SET_REF_NUM(HFRP_MESSAGE_FIELD_SIZE,
+        commandPayloadSize + HFRP_MESSAGE_HEADER_BYTE_SIZE, 0U);
     pMailboxIoInfo = &(pKernelHfrp->khfrpInfo.mailboxIoInfo);
-    status = khfrpAllocateSequenceId_IMPL(pKernelHfrp, pResponseStatus, pResponsePayload,pResponsePayloadSize, pStatus, &sequenceId);
-    if (status == NV_ERR_NO_MEMORY)
-    {
-        NV_PRINTF(LEVEL_ERROR, "Cannot allocate hfrp sequence ID due to out of memory \n");
-        *pStatus = status;
-        return status;
-    }
-
+    status = khfrpAllocateSequenceId_IMPL(pKernelHfrp, pResponseStatus,
+        pResponsePayload, pResponsePayloadSize, &status1, &sequenceId);
     if (status == NV_ERR_IN_USE)
     {
-        NV_PRINTF(LEVEL_ERROR, "Cannot allocate hfrp sequence ID due to out of sequence in use \n");
-        *pStatus = status;
         return status;
     }
-    commandHeader = FLD_SET_REF_NUM(HFRP_MESSAGE_FIELD_SEQUENCE_ID, sequenceId, commandHeader);
-    commandHeader = FLD_SET_REF_NUM(HFRP_MESSAGE_FIELD_INDEX_OR_STATUS, (NvU32)commandIndex, commandHeader);
+    commandHeader = FLD_SET_REF_NUM(HFRP_MESSAGE_FIELD_SEQUENCE_ID, sequenceId,
+                                    commandHeader);
+    commandHeader = FLD_SET_REF_NUM(HFRP_MESSAGE_FIELD_INDEX_OR_STATUS,
+                                    (NvU32)commandIndex, commandHeader);
 
-    status = khfrpMailboxQueueMessage_IMPL(pKernelHfrp, commandHeader, pCommandPayload,
-                                     commandPayloadSize, HFRP_COMMAND_MAILBOX_FLAG);
-    if (status != NV_OK)
+    status = khfrpMailboxQueueMessage_IMPL(pKernelHfrp, commandHeader,
+        pCommandPayload, commandPayloadSize, HFRP_COMMAND_MAILBOX_FLAG);
+    if (status == NV_ERR_BUFFER_FULL)
     {
         khfrpFreeSequenceId_IMPL(pKernelHfrp, sequenceId);
-        NV_PRINTF(LEVEL_ERROR, "Failed to queue HFRP command\n");
-                *pStatus = status;
-        return NV_ERR_GENERIC;
+        return status;
     }
-
-    khfrpWriteBit_IMPL(pKernelHfrp, pMailboxIoInfo->hfrpIrqInSetAddr, HFRP_IRQ_DOORBELL_BIT_INDEX, 1U);
+    
+    khfrpWriteBit_IMPL(pKernelHfrp, pMailboxIoInfo->hfrpIrqInSetAddr,
+                    HFRP_IRQ_DOORBELL_BIT_INDEX, 1U);
 
     while (NV_TRUE)
     {
-        status = khfrpPollOnIrqWrapper_IMPL(pKernelHfrp, pMailboxIoInfo->hfrpIrqOutSetAddr, HFRP_IRQ_DOORBELL_BIT_INDEX, NV_TRUE);
+        status = khfrpPollOnIrqWrapper_IMPL(pKernelHfrp, pMailboxIoInfo->hfrpIrqOutSetAddr,
+            HFRP_IRQ_DOORBELL_BIT_INDEX, NV_TRUE);
         if (status == NV_ERR_TIMEOUT)
         {
-            NV_PRINTF(LEVEL_ERROR, "timed out while waiting for IRQ_OUT_SET to receive notify reset server complete\n");
-            *pStatus = status;
+            khfrpFreeSequenceId_IMPL(pKernelHfrp, sequenceId);
+            NV_PRINTF(LEVEL_INFO,
+                      "Timed out while waiting to receive response for the command posted\n");
             return status;
         }
 
-        khfrpServiceEvent_IMPL(pKernelHfrp);
+        status = khfrpServiceEvent_IMPL(pKernelHfrp);
+        if (status == NV_ERR_INVALID_STATE)
+        {
+            khfrpFreeSequenceId_IMPL(pKernelHfrp, sequenceId);
+            return status;
+        }
         if (khfrpIsSequenceIdFree_IMPL(pKernelHfrp, sequenceId))
         {
-            break;
+            return status1;
         }
     }
-    return NV_OK;
 }
-

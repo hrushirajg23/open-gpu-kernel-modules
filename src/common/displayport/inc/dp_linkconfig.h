@@ -42,6 +42,8 @@ extern NvU32 bSupportInternalUhbrOnFpga;
 namespace DisplayPort
 {
     typedef NvU64 LinkRate;
+    #define LinkRate_fmtx NvU64_fmtx
+    #define LinkRate_fmtu NvU64_fmtu
 
     class LinkRates : virtual public Object
     {

@@ -39,8 +39,6 @@ void nvDPNotifyShortPulse(NVDPLibConnectorPtr pNVDpLibConnector);
 
 void nvDPDestroyConnector(NVDPLibConnectorPtr pNVDpLibConnector);
 
-NvBool nvDPIsLinkAwaitingTransition(NVConnectorEvoPtr pConnectorEvo);
-
 NVDPLibModesetStatePtr nvDPLibCreateModesetState(
     const NVDispEvoRec *pDispEvo,
     const NvU32 head,

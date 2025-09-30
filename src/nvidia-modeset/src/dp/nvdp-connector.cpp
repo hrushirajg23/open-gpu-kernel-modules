@@ -151,16 +151,6 @@ void nvDPDestroyConnector(NVDPLibConnectorPtr pNVDpLibConnector)
     nvFree(pNVDpLibConnector);
 }
 
-NvBool nvDPIsLinkAwaitingTransition(NVConnectorEvoPtr pConnectorEvo)
-{
-    if (nvConnectorUsesDPLib(pConnectorEvo)) {
-        DisplayPort::Connector *c = pConnectorEvo->pDpLibConnector->connector;
-        return c->isLinkAwaitingTransition();
-    }
-
-    return FALSE;
-}
-
 /*!
  * Create a new DisplayPort group and populate it with the devices specified by
  * dpyIdList.  For MST groups, this allocates a dynamic RM display ID.
@@ -1128,10 +1118,11 @@ void nvDPSetAllowMultiStreamingOneConnector(
     pDpLibConnector->connector->setAllowMultiStreaming(allowMST);
 }
 
-static NvBool IsDpSinkMstCapableForceSst(const NVDispEvoRec *pDispEvo,
-                                         const NvU32 apiHead,
-                                         void *pData)
+static NvBool IsDpSinkMstTransitionNeeded(const NVDispEvoRec *pDispEvo,
+                                          const NvU32 apiHead,
+                                          void *pData)
 {
+    const NvBool *pAllowMST = reinterpret_cast<const NvBool*>(pData);
     const NVDispApiHeadStateEvoRec *pApiHeadState =
         &pDispEvo->apiHeadState[apiHead];
     const NVDpyEvoRec *pDpyEvo =
@@ -1147,49 +1138,24 @@ static NvBool IsDpSinkMstCapableForceSst(const NVDispEvoRec *pDispEvo,
     DisplayPort::Connector *c =
         pConnectorEvo->pDpLibConnector->connector;
 
-    return (c->getSinkMultiStreamCap() && !c->getAllowMultiStreaming());
-}
+    return c->isLinkAwaitingTransition() ||
+           (c->getSinkMultiStreamCap() &&
+            c->getAllowMultiStreaming() != *pAllowMST);
 
-static NvBool IsDpLinkTransitionWaitingForHeadShutDown(
-    const NVDispEvoRec *pDispEvo,
-    const NvU32 apiHead,
-    void *pData)
-{
-    const NVDispApiHeadStateEvoRec *pApiHeadState =
-        &pDispEvo->apiHeadState[apiHead];
-    const NVDpyEvoRec *pDpyEvo =
-        nvGetOneArbitraryDpyEvo(pApiHeadState->activeDpys, pDispEvo);
-
-    return (pDpyEvo != NULL) &&
-           nvDPIsLinkAwaitingTransition(pDpyEvo->pConnectorEvo);
 }
 
 void nvDPSetAllowMultiStreaming(NVDevEvoPtr pDevEvo, NvBool allowMST)
 {
-    NvBool needUpdate = FALSE;
     NVDispEvoPtr pDispEvo;
     NvU32 dispIndex;
 
-    FOR_ALL_EVO_DISPLAYS(pDispEvo, dispIndex, pDevEvo) {
-        NVConnectorEvoPtr pConnectorEvo;
-
-        FOR_ALL_EVO_CONNECTORS(pConnectorEvo, pDispEvo) {
-            NVDPLibConnectorPtr pDpLibConnector =
-                                pConnectorEvo->pDpLibConnector;
-            if (pDpLibConnector &&
-                pDpLibConnector->connector->getAllowMultiStreaming()
-                    != allowMST) {
-                needUpdate = TRUE;
-            }
-        }
-    }
-
-    if (!needUpdate) {
-        return;
-    }
-
+    /*
+     * Shut down any heads that are driving SST and need to transition to MST,
+     * and any heads where we're toggling the value of allowMST.
+     */
     nvShutDownApiHeads(pDevEvo, pDevEvo->pNvKmsOpenDev,
-                       IsDpSinkMstCapableForceSst, NULL /* pData */,
+                       IsDpSinkMstTransitionNeeded,
+                       reinterpret_cast<void *>(&allowMST),
                        TRUE /* doRasterLock */);
 
     /*
@@ -1214,15 +1180,10 @@ void nvDPSetAllowMultiStreaming(NVDevEvoPtr pDevEvo, NvBool allowMST)
         }
     }
 
-    /* Shut down all DisplayPort heads that need to transition to/from SST. */
-    nvShutDownApiHeads(pDevEvo, pDevEvo->pNvKmsOpenDev,
-                       IsDpLinkTransitionWaitingForHeadShutDown,
-                       NULL /* pData */,
-                       TRUE /* doRasterLock */);
-
     /*
      * Handle any pending timers the DP library scheduled to notify us
-     * about changes in the connected device list.
+     * about changes to MST devices on connectors that now allow or disallow
+     * MST.
      */
     nvDPFireExpiredTimers(pDevEvo);
 }

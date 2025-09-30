@@ -295,7 +295,7 @@ static void *uvm_mmu_page_table_cpu_map(uvm_gpu_t *gpu, uvm_mmu_page_table_alloc
 {
     // CDMM implies there are no struct pages corresponding to the
     // GPU memory physical address.
-    if (gpu->mem_info.cdmm_enabled) {
+    if (gpu->parent->cdmm_enabled) {
         NvU64 addr = uvm_gpu_chunk_to_sys_addr(&gpu->pmm, phys_alloc->handle.chunk);
         // Using cached access for coherent systems, there should be no conflicts
         // for the vidmem region
@@ -312,7 +312,7 @@ static void *uvm_mmu_page_table_cpu_map(uvm_gpu_t *gpu, uvm_mmu_page_table_alloc
 
 static void uvm_mmu_page_table_cpu_unmap(uvm_gpu_t *gpu, uvm_mmu_page_table_alloc_t *phys_alloc, void *ptr)
 {
-    if (gpu->mem_info.cdmm_enabled)
+    if (gpu->parent->cdmm_enabled)
         nv_iounmap(ptr, PAGE_SIZE);
     else
         kunmap(uvm_mmu_page_table_page(gpu, phys_alloc));

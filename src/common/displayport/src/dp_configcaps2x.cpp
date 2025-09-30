@@ -616,7 +616,7 @@ void DPCDHALImpl2x::overrideCableIdCap(LinkRate linkRate, bool bEnable)
             caps2x.rxCableCaps .bUHBR_10GSupported = bEnable;
             break;
         default:
-            DP_PRINTF(DP_ERROR, "DPHAL> Invalid link rate (%d) to override.", linkRate);
+            DP_PRINTF(DP_ERROR, "DPHAL> Invalid link rate (%" LinkRate_fmtu ") to override.", linkRate);
     }
 }
 

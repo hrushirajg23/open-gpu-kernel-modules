@@ -170,12 +170,15 @@ struct tagNVHDMIPKT_CLASS
     // capacity required for target timing.
     //
     NVHDMIPKT_RESULT
-    (*hdmiAssessLinkCapabilities)  (NVHDMIPKT_CLASS             *pThis,
-                                    NvU32                        subDevice,
-                                    NvU32                        displayId,
+    (*hdmiAssessLinkCapabilities)  (NVHDMIPKT_CLASS      *pThis,
+                                    NvU32                 subDevice,
+                                    NvU32                 displayId,
                                     NVT_EDID_INFO         const * const pSinkEdid,
-                                    HDMI_SRC_CAPS               *pSrcCaps,
-                                    HDMI_SINK_CAPS              *pSinkCaps);
+                                    const NvBool          bPerformLinkTrainingToAssess,
+                                    const NvBool          bIsDisplayActive,
+                                    HDMI_FRL_DATA_RATE    currFRLRate,
+                                    HDMI_SRC_CAPS        *pSrcCaps,
+                                    HDMI_SINK_CAPS       *pSinkCaps);
     NVHDMIPKT_RESULT
     (*hdmiQueryFRLConfig)       (NVHDMIPKT_CLASS                     *pThis,
                                  HDMI_VIDEO_TRANSPORT_INFO     const * const pVidTransInfo,

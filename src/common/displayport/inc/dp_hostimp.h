@@ -39,7 +39,11 @@ extern "C" void dpFree(void * ptr);
 extern "C" void dpDebugBreakpoint();
 // Note: dpPrint() implementations are expected to append a newline themselves.
 extern "C" void dpPrint(const char * formatter, ...);
-extern "C" void dpPrintf(DP_LOG_LEVEL severity, const char * formatter, ...);
+extern "C" void dpPrintf(DP_LOG_LEVEL severity, const char * formatter, ...)
+#if defined(__GNUC__)
+    __attribute__ ((format (printf, 2, 3)))
+#endif
+;
 extern "C" void dpTraceEvent(NV_DP_TRACING_EVENT event,
                              NV_DP_TRACING_PRIORITY priority, NvU32 numArgs, ...);
 

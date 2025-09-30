@@ -402,6 +402,18 @@ void __nvoc_init_dataField_MemoryManager(MemoryManager *pThis, GpuHalspecOwner *
         pThis->bFastScrubberEnabled = NV_FALSE;
     }
 
+    // Hal field -- bFastScrubberSupportsSysmem
+    if (( ((chipHal_HalVarIdx >> 5) == 1UL) && ((1UL << (chipHal_HalVarIdx & 0x1f)) & 0x80000000UL) ) ||
+        ( ((chipHal_HalVarIdx >> 5) == 2UL) && ((1UL << (chipHal_HalVarIdx & 0x1f)) & 0x00000c00UL) )) /* ChipHal: GB10B | GB20B | GB20C */ 
+    {
+        pThis->bFastScrubberSupportsSysmem = NV_TRUE;
+    }
+    // default
+    else
+    {
+        pThis->bFastScrubberSupportsSysmem = NV_FALSE;
+    }
+
     // Hal field -- bSysmemPageSizeDefaultAllowLargePages
     if (( ((chipHal_HalVarIdx >> 5) == 1UL) && ((1UL << (chipHal_HalVarIdx & 0x1f)) & 0x80000000UL) ) ||
         ( ((chipHal_HalVarIdx >> 5) == 2UL) && ((1UL << (chipHal_HalVarIdx & 0x1f)) & 0x00000c00UL) )) /* ChipHal: GB10B | GB20B | GB20C */ 
