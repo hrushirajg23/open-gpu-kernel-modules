@@ -788,7 +788,9 @@ static inline NV_STATUS ksec2GetGenericBlUcode_5baef9(struct OBJGPU *pGpu, struc
 
 const BINDATA_ARCHIVE *ksec2GetBinArchiveSecurescrubUcode_AD10X(struct OBJGPU *pGpu, struct KernelSec2 *pKernelSec2);
 
+//returns NULL , probably because this architecture is not present
 static inline const BINDATA_ARCHIVE *ksec2GetBinArchiveSecurescrubUcode_80f438(struct OBJGPU *pGpu, struct KernelSec2 *pKernelSec2) {
+	NV_PRINTF(LEVEL_ERROR, "manual : returning NULL\n");
     NV_ASSERT_OR_RETURN_PRECOMP(0, ((void *)0));
 }
 

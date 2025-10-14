@@ -213,6 +213,7 @@ s_allocateUcodeFromBinArchive
     const BINDATA_STORAGE *pBinPatchMeta;
     const BINDATA_STORAGE *pBinNumSigs;
 
+	NV_PRINTF(LEVEL_ERROR, "manual : s_allocateUcodeFromBinArchive(): loadinh Ucode from BinArchive \n");
     if (kgspIsDebugModeEnabled_HAL(pGpu, pKernelGsp))
     {
         pBinImage = bindataArchiveGetStorage(pBinArchive, BINDATA_LABEL_IMAGE_DBG);
@@ -225,20 +226,24 @@ s_allocateUcodeFromBinArchive
         pBinHeader = bindataArchiveGetStorage(pBinArchive, BINDATA_LABEL_HEADER_PROD);
         pBinSig = bindataArchiveGetStorage(pBinArchive, BINDATA_LABEL_SIG_PROD);
     }
+	NV_PRINTF(LEVEL_ERROR, "manual : s_allocateUcodeFromBinArchive(): Asserting Image Header Sig\n");
 
     NV_ASSERT_OR_RETURN(pBinImage != NULL, NV_ERR_NOT_SUPPORTED);
     NV_ASSERT_OR_RETURN(pBinHeader != NULL, NV_ERR_NOT_SUPPORTED);
     NV_ASSERT_OR_RETURN(pBinSig != NULL, NV_ERR_NOT_SUPPORTED);
+	NV_PRINTF(LEVEL_ERROR, "manual : s_allocateUcodeFromBinArchive(): Asserted Image Header Sig\n");
 
     pBinPatchSig = bindataArchiveGetStorage(pBinArchive, BINDATA_LABEL_PATCH_SIG);
     pBinPatchLoc = bindataArchiveGetStorage(pBinArchive, BINDATA_LABEL_PATCH_LOC);
     pBinPatchMeta = bindataArchiveGetStorage(pBinArchive, BINDATA_LABEL_PATCH_META);
     pBinNumSigs = bindataArchiveGetStorage(pBinArchive, BINDATA_LABEL_NUM_SIGS);
+	NV_PRINTF(LEVEL_ERROR, "manual : s_allocateUcodeFromBinArchive(): Asserting Patches\n");
 
     NV_ASSERT_OR_RETURN(pBinPatchSig != NULL, NV_ERR_NOT_SUPPORTED);
     NV_ASSERT_OR_RETURN(pBinPatchLoc != NULL, NV_ERR_NOT_SUPPORTED);
     NV_ASSERT_OR_RETURN(pBinPatchMeta != NULL, NV_ERR_NOT_SUPPORTED);
     NV_ASSERT_OR_RETURN(pBinNumSigs != NULL, NV_ERR_NOT_SUPPORTED);
+	NV_PRINTF(LEVEL_ERROR, "manual : s_allocateUcodeFromBinArchive(): Asserted Patches\n");
 
     pFlcnUcode = portMemAllocNonPaged(sizeof(*pFlcnUcode));
     if (pFlcnUcode == NULL)
@@ -251,6 +256,7 @@ s_allocateUcodeFromBinArchive
     NV_ASSERT_OK_OR_GOTO(status,
         s_bindataWriteToFixedSizeBuffer(pBinHeader, &header, sizeof(header)),
         out);
+	NV_PRINTF(LEVEL_ERROR, "manual : s_allocateUcodeFromBinArchive(): Header Retrieved\n");
 
     if (header.numApps != 1)
     {
@@ -263,12 +269,13 @@ s_allocateUcodeFromBinArchive
     NV_ASSERT_OK_OR_GOTO(status,
         s_bindataWriteToFixedSizeBuffer(pBinPatchLoc, &patchLoc, sizeof(patchLoc)),
         out);
+NV_PRINTF(LEVEL_ERROR, "manual : s_allocateUcodeFromBinArchive(): Retrieved Signature Patch Location\n");
 
     // Retrieve signature patch index
     NV_ASSERT_OK_OR_GOTO(status,
         s_bindataWriteToFixedSizeBuffer(pBinPatchSig, &patchSig, sizeof(patchSig)),
         out);
-
+NV_PRINTF(LEVEL_ERROR, "manual : s_allocateUcodeFromBinArchive(): Retrieved Signature Patch Index\n");
     if (patchSig != 0)
     {
         NV_ASSERT(0);
@@ -285,7 +292,7 @@ s_allocateUcodeFromBinArchive
     NV_ASSERT_OK_OR_GOTO(status,
         s_bindataWriteToFixedSizeBuffer(pBinNumSigs, &numSigs, sizeof(numSigs)),
         out);
-
+NV_PRINTF(LEVEL_ERROR, "manual : s_allocateUcodeFromBinArchive(): Retrieved Signatures\n");
     if (numSigs == 0)
     {
         NV_ASSERT(0);
@@ -305,6 +312,7 @@ s_allocateUcodeFromBinArchive
     NV_ASSERT_OK_OR_GOTO(status,
         bindataStorageAcquireData(pBinSig, &pSignatures),
         out);
+NV_PRINTF(LEVEL_ERROR, "manual : s_allocateUcodeFromBinArchive(): Populating KernelGspFlcnUcode\n");
 
     // Populate KernelGspFlcnUcode structure
     if (staticCast(pKernelGsp, KernelFalcon)->bBootFromHs)
@@ -355,6 +363,8 @@ s_allocateUcodeFromBinArchive
         // Patch signatures (only if image copy above succeeded)
         if (status == NV_OK)
         {
+NV_PRINTF(LEVEL_ERROR, "manual : s_allocateUcodeFromBinArchive(): image copy passed\n");
+
             status = s_patchBooterUcodeSignature(pGpu,
                 patchMeta.ucodeId,
                 pMappedUcodeMem, patchLoc, pUcode->size,
@@ -367,11 +377,15 @@ s_allocateUcodeFromBinArchive
 
         if (status != NV_OK)
         {
+NV_PRINTF(LEVEL_ERROR, "manual : s_allocateUcodeFromBinArchive(): image copy failed\n");
+
             goto out;
         }
     }
     else
     {
+NV_PRINTF(LEVEL_ERROR, "manual : s_allocateUcodeFromBinArchive(): above static cast failed\n");
+
         KernelGspFlcnUcodeBootDirect *pUcode = &pFlcnUcode->ucodeBootDirect;
 
         pFlcnUcode->bootType = KGSP_FLCN_UCODE_BOOT_DIRECT;
@@ -417,10 +431,12 @@ out:
 
     if (status == NV_OK)
     {
+		NV_PRINTF(LEVEL_ERROR, "manual : s_allocateUcodeFromBinArchive(): status okay\n");
         *ppFlcnUcode = pFlcnUcode;
     }
     else
     {
+		NV_PRINTF(LEVEL_ERROR, "manual : s_allocateUcodeFromBinArchive(): status not okay\n");
         kgspFreeFlcnUcode(pFlcnUcode);
         pFlcnUcode = NULL;
     }
@@ -442,6 +458,7 @@ kgspAllocateBooterLoadUcodeImage_IMPL
 
     pBinArchive = kgspGetBinArchiveBooterLoadUcode_HAL(pKernelGsp);
     NV_ASSERT_OR_RETURN(pBinArchive != NULL, NV_ERR_NOT_SUPPORTED);
+	 NV_PRINTF(LEVEL_ERROR, "manual: kgspAllocateBooterLoadUcodeImage_IMPL(): allocating UcodefromBinArchive\n");
 
     return s_allocateUcodeFromBinArchive(pGpu, pKernelGsp, pBinArchive, ppBooterLoadUcode);
 }
@@ -461,7 +478,8 @@ kgspAllocateBooterUnloadUcodeImage_IMPL
     pBinArchive = kgspGetBinArchiveBooterUnloadUcode_HAL(pKernelGsp);
     NV_ASSERT_OR_RETURN(pBinArchive != NULL, NV_ERR_NOT_SUPPORTED);
 
-    return s_allocateUcodeFromBinArchive(pGpu, pKernelGsp, pBinArchive, ppBooterUnloadUcode);
+	 NV_PRINTF(LEVEL_ERROR, "manual: kgspAllocateBooterUnloadUcodeImage_IMPL(): allocating UcodefromBinArchive\n");
+   return s_allocateUcodeFromBinArchive(pGpu, pKernelGsp, pBinArchive, ppBooterUnloadUcode);
 }
 
 //
@@ -479,12 +497,17 @@ kgspAllocateScrubberUcodeImage_IMPL
 {
     KernelSec2 *pKernelSec2 = GPU_GET_KERNEL_SEC2(pGpu);
     const BINDATA_ARCHIVE *pBinArchive;
+	 NV_PRINTF(LEVEL_ERROR, "manual: kgspAllocateScrubberUcodeImage_IMPL(): init\n");
 
     NV_ASSERT_OR_RETURN(pKernelSec2 != NULL, NV_ERR_INVALID_STATE);
+ NV_PRINTF(LEVEL_ERROR, "manual: kgspAllocateScrubberUcodeImage_IMPL(): pKernelSec2 assert failed\n");
+
     NV_ASSERT_OR_RETURN(ppScrubberUcode != NULL, NV_ERR_INVALID_ARGUMENT);
+	 NV_PRINTF(LEVEL_ERROR, "manual: kgspAllocateScrubberUcodeImage_IMPL(): ppScrubberUcode assert failed\n");
 
     pBinArchive = ksec2GetBinArchiveSecurescrubUcode_HAL(pGpu, pKernelSec2);
     NV_ASSERT_OR_RETURN(pBinArchive != NULL, NV_ERR_NOT_SUPPORTED);
+	 NV_PRINTF(LEVEL_ERROR, "manual: kgspAllocateScrubberUcodeImage_IMPL(): allocating UcodefromBinArchive\n");
 
     return s_allocateUcodeFromBinArchive(pGpu, pKernelGsp, pBinArchive, ppScrubberUcode);
 }

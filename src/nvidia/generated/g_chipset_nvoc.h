@@ -337,6 +337,18 @@ struct OBJCL {
     NvBool PDB_PROP_CL_UPSTREAM_LTR_SUPPORTED;
     NvBool PDB_PROP_CL_BUG_1340801_DISABLE_GEN3_ON_GIGABYTE_SNIPER_3;
     NvBool PDB_PROP_CL_BUG_1681803_WAR_DISABLE_MSCG;
+	/*
+		manual:
+		TC = Traffic Class
+		Force all PCIe transactions to use TC0 (non-cacheable path)
+		| Field                                          | Meaning                                                                                  |
+		| ---------------------------------------------- | ---------------------------------------------------------------------------------------- |
+		| **PDB_PROP_CL_PCIE_NON_COHERENT_USE_TC0_ONLY** | Driver property indicating GPU PCIe DMA must use TC0 (non-coherent transactions).        |
+		| **Why**                                        | Because SoC interconnect doesn’t support I/O coherency or ACE-Lite snooping.             |
+		| **Effect**                                     | Driver uses non-cacheable PCIe accesses; relies on Linux DMA APIs to maintain coherency. |
+		| **Platforms**                                  | RK3588, some Tegra SoCs, Jetson devices without ACE-Lite ports, etc.                     |
+
+	*/
     NvBool PDB_PROP_CL_PCIE_NON_COHERENT_USE_TC0_ONLY;
     NvBool PDB_PROP_CL_UNSUPPORTED_CHIPSET;
     NvBool PDB_PROP_CL_IS_CHIPSET_IO_COHERENT;

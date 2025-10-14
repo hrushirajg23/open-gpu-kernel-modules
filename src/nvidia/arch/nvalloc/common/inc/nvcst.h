@@ -97,6 +97,7 @@ CHIPSET_SETUP_FUNC(PLDA_XpressRichAXI_setupFunc)
 CHIPSET_SETUP_FUNC(Riscv_generic_setupFunc)
 CHIPSET_SETUP_FUNC(Intel_A70D_setupFunc)
 CHIPSET_SETUP_FUNC(AMD_14D8_setupFunc)
+CHIPSET_SETUP_FUNC(RK3588_setupFunc)
 
 
 // Keep string length <=32 (including termination) to avoid string copy overflow
@@ -298,6 +299,8 @@ CSINFO chipsetInfo[] =
     {PCI_VENDOR_ID_AMPERE,      0xE20E, CS_AMPERE_AMPEREONE192, "Ampere AmpereOne-192", Ampere_AmpereOne_setupFunc},
     {PCI_VENDOR_ID_AMPERE,      0xE20F, CS_AMPERE_AMPEREONE192, "Ampere AmpereOne-192", Ampere_AmpereOne_setupFunc},
 
+	{PCI_VENDOR_ID_ROCKCHIP,      0x3588, CS_ROCKCHIP_RK3588, "Rockchip RK3588", RK3588_setupFunc},
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     // last element must have chipset CS_UNKNOWN (zero)
@@ -335,6 +338,7 @@ VENDORNAME vendorName[] =
     {PCI_VENDOR_ID_SIFIVE,      "SiFive"},
     {PCI_VENDOR_ID_PLDA,        "PLDA"},
     {PCI_VENDOR_ID_PHYTIUM,     "Phytium"},
+    {PCI_VENDOR_ID_ROCKCHIP,     "Rockchip"},
     {0,                         "Unknown"} // Indicates end of the table
 };
 
@@ -420,6 +424,7 @@ ARMCSALLOWLISTINFO armChipsetAllowListInfo[] =
     {PCI_VENDOR_ID_AMPERE,      0xE20D, CS_AMPERE_AMPEREONE192},   // Ampere AmpereOne-192
     {PCI_VENDOR_ID_AMPERE,      0xE20E, CS_AMPERE_AMPEREONE192},   // Ampere AmpereOne-192
     {PCI_VENDOR_ID_AMPERE,      0xE20F, CS_AMPERE_AMPEREONE192},   // Ampere AmpereOne-192
+	{PCI_VENDOR_ID_ROCKCHIP,      0x3588 , CS_ROCKCHIP_RK3588},   //Rockchip rk3588
 
     // last element must have chipset CS_UNKNOWN (zero)
     {0,                         0,      CS_UNKNOWN}

@@ -88,6 +88,7 @@
 #define NV_PCI_SUBID_VENDOR_PC_PARTNER    0x174B
 #define NV_PCI_SUBID_VENDOR_CAVIUM        0x177D
 #define NV_PCI_SUBID_VENDOR_NZXT          0x1D96
+#define NV_PCI_SUBID_VENDOR_ROCKCHIP      0x1d87
 
 // XXX CKEANUP TO REMOVE IN FAVOR OF NV_PCI_SUBID_VENDOR_*
 #define PCI_VENDOR_ID_AMD           0x1022
@@ -150,6 +151,7 @@
 #define PCI_VENDOR_ID_SIFIVE        0xF15E
 #define PCI_VENDOR_ID_PLDA          0x1556
 #define PCI_VENDOR_ID_PHYTIUM       0x1DB7
+#define PCI_VENDOR_ID_ROCKCHIP       0x1D87
 
 #define NV_PCI_DEVID_DEVICE                    31:16  /* RW--F */
 #define NV_PCI_SUBID_DEVICE                    31:16  /* RW--F */
@@ -655,6 +657,7 @@ enum {
 ,     CS_INTEL_B660
 ,     CS_AMPERE_AMPEREONE192
 ,     CS_MAX_PCIE
+,	  CS_ROCKCHIP_RK3588
 };
 
 // Chip IDs for Tegra SoCs

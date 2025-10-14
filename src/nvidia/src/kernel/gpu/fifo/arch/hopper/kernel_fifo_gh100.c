@@ -122,8 +122,10 @@ kfifoConstructUsermodeMemdescs_GH100
         // Set cache snoop settings. SYSCOH_OVER_BAR1 signals a special mapping type of HW registers.
         // By definition should be mapped as SYSCOH.
         //
-        memdescSetGpuCacheSnoop(*ppMemDesc, MEMDESC_CACHE_SNOOP_ENABLE);
-        memdescSetCpuCacheSnoop(*ppMemDesc, MEMDESC_CACHE_SNOOP_ENABLE);
+		/* Currently disable cache snooping from both ends since
+		rk3588's pcie in non coherent */
+        memdescSetGpuCacheSnoop(*ppMemDesc, MEMDESC_CACHE_SNOOP_DISABLE);
+        memdescSetCpuCacheSnoop(*ppMemDesc, MEMDESC_CACHE_SNOOP_DISABLE);
     }
 
     NV_ASSERT_OK_OR_GOTO(status,

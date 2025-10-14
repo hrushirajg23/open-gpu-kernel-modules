@@ -1179,7 +1179,38 @@ ARMV8_generic_setupFunc
     OBJCL *pCl
 )
 {
+//    RmPhysAddr baseAddress = (RmPhysAddr)(osPciReadDword(pCl->FHBAddr.handle,
+  //                                            RK3588_CONFIG_SPACE_BASE_ADDRESS));
+
+	//if (clInsertPcieConfigSpaceBase(pCl, baseAddress, 0, 0, (NvU8)(PCI_MAX_BUSES - 1)) == NV_OK)
+	//	pCl->setProperty(pCl, PDB_PROP_CL_PCIE_CONFIG_ACCESSIBLE, NV_TRUE);
+
+ // TODO Need to check if any more PDB properties should be set
     return NV_OK;
+}
+
+// Rockchip rk3588 setup function
+static NV_STATUS
+RK3588_setupFunc
+(
+	OBJCL *pCl
+)
+{
+	/*
+ if (clInsertPcieConfigSpaceBase(pCl, 0, 0, 0, (NvU8)(PCI_MAX_BUSES - 1)) == NV_OK)
+        pCl->setProperty(pCl, PDB_PROP_CL_PCIE_CONFIG_ACCESSIBLE, NV_TRUE);
+		*/
+
+		//or using base address
+	
+//  RmPhysAddr baseAddress = (RmPhysAddr)(osPciReadDword(pCl->FHBAddr.handle,
+  //                                            RK3588_CONFIG_SPACE_BASE_ADDRESS));
+
+	//if (clInsertPcieConfigSpaceBase(pCl, baseAddress, 0, 0, (NvU8)(PCI_MAX_BUSES - 1)) == NV_OK)
+	//	pCl->setProperty(pCl, PDB_PROP_CL_PCIE_CONFIG_ACCESSIBLE, NV_TRUE);
+
+	pCl->setProperty(pCl, PDB_PROP_CL_IS_CHIPSET_IO_COHERENT, NV_FALSE);
+	pCl->setProperty(pCl, PDB_PROP_CL_PCIE_NON_COHERENT_USE_TC0_ONLY, NV_TRUE);
 }
 
 // Marvell ThunderX2 Setup Function
@@ -1336,6 +1367,8 @@ PLDA_XpressRichAXI_setupFunc
 #if NVCPU_IS_RISCV64
     pCl->setProperty(pCl, PDB_PROP_CL_IS_CHIPSET_IO_COHERENT, NV_TRUE);
 #endif
+
+
     return NV_OK;
 }
 

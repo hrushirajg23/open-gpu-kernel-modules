@@ -1358,15 +1358,16 @@ RmSetupRegisters(
 {
     NV_STATUS ret;
 
-    NV_DEV_PRINTF(NV_DBG_SETUP, nv, "RmSetupRegisters for 0x%x:0x%x\n",
+    NV_DEV_PRINTF(LEVEL_ERROR, nv, "RmSetupRegisters for 0x%x:0x%x\n",
               nv->pci_info.vendor_id, nv->pci_info.device_id);
-    NV_DEV_PRINTF(NV_DBG_SETUP, nv, "pci config info:\n");
-    NV_DEV_PRINTF(NV_DBG_SETUP, nv, "   registers look  like: 0x%" NvU64_fmtx " 0x%" NvU64_fmtx,
-              nv->regs->cpu_address, nv->regs->size);
+    NV_DEV_PRINTF(LEVEL_ERROR, nv, "pci config info:\n");
+    NV_DEV_PRINTF(LEVEL_ERROR, nv, "   registers look  like: 0x%" NvU64_fmtx " 0x%" NvU64_fmtx,
+nv->regs->cpu_address, nv->regs->size);
+	NV_PRINTF(LEVEL_ERROR, "RmSetupRegisters for \n");
 
-    if (nv->fb != NULL)
+	if (nv->fb != NULL)
     {
-        NV_DEV_PRINTF(NV_DBG_SETUP, nv, "   fb        looks like: 0x%" NvU64_fmtx " 0x%" NvU64_fmtx "\n",
+        NV_DEV_PRINTF(LEVEL_ERROR, nv, "   fb        looks like: 0x%" NvU64_fmtx " 0x%" NvU64_fmtx "\n",
                 nv->fb->cpu_address, nv->fb->size);
     }
 
@@ -1374,14 +1375,14 @@ RmSetupRegisters(
 
     if (nv->regs->map == NULL)
     {
-        NV_DEV_PRINTF(NV_DBG_ERRORS, nv, "Failed to map regs registers!!\n");
+        NV_DEV_PRINTF(LEVEL_ERROR, nv, "Failed to map regs registers!!\n");
         RM_SET_ERROR(*status, RM_INIT_REG_SETUP_FAILED);
         status->rmStatus   = NV_ERR_OPERATING_SYSTEM;
         return;
     }
-    NV_DEV_PRINTF(NV_DBG_SETUP, nv, "Successfully mapped framebuffer and registers\n");
-    NV_DEV_PRINTF(NV_DBG_SETUP, nv, "final mappings:\n");
-    NV_DEV_PRINTF(NV_DBG_SETUP, nv, "    regs: 0x%" NvU64_fmtx " 0x%" NvU64_fmtx " 0x%p\n",
+    NV_DEV_PRINTF(LEVEL_ERROR, nv, "Successfully mapped framebuffer and registers\n");
+    NV_DEV_PRINTF(LEVEL_ERROR, nv, "final mappings:\n");
+    NV_DEV_PRINTF(LEVEL_ERROR, nv, "    regs: 0x%" NvU64_fmtx " 0x%" NvU64_fmtx " 0x%p\n",
               nv->regs->cpu_address, nv->regs->size, nv->regs->map);
 
     ret = RmSetupDpauxRegisters(nv, status);

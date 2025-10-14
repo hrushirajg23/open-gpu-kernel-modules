@@ -289,6 +289,9 @@ typedef enum
      */
     GMMU_APERTURE_PEER,
 
+	/* manual : use the below flag for Non coherent , as rk3588 pcie is uses
+	the axi interface being non - coherent */
+
     /*!
      * Non-coherent system memory.
      *

@@ -3481,6 +3481,7 @@ _kgspPrepareScrubberImageIfNeeded(OBJGPU *pGpu, KernelGsp *pKernelGsp)
     NV_PRINTF(LEVEL_INFO, "pre-scrubbed memory: 0x%llx bytes, needed: 0x%llx bytes\n",
               prescrubbedSize, neededSize);
 
+	NV_PRINTF(LEVEL_ERROR, "preparing scrubber image \n");
     // WAR for Bug 5016200 - Always run scrubber from kernel RM for ADA config
     if ((neededSize > prescrubbedSize) || kgspIsScrubberImageSupported(pGpu, pKernelGsp))
         NV_CHECK_OK_OR_RETURN(LEVEL_ERROR,
@@ -3533,6 +3534,7 @@ _kgspSetFwWprLayoutOffset
 {
     if (!pGpu->getProperty(pGpu, PDB_PROP_GPU_FW_WPR_OFFSET_SET_BY_ACR))
     {
+		NV_PRINTF(LEVEL_ERROR, "manual:_kgspSetFwWprLayoutOffset(): failed to get property FW_WPR_OFFSET \n"); 
         return;
     }
 
@@ -3615,9 +3617,10 @@ _kgspBootGspRm(OBJGPU *pGpu, KernelGsp *pKernelGsp, GSP_FIRMWARE *pGspFw, GPU_MA
     NV_STATUS status;
     NvBool bEccDisabled = !kmemsysCheckReadoutEccEnablement(pGpu, GPU_GET_KERNEL_MEMORY_SYSTEM(pGpu));
 
+	NV_PRINTF(LEVEL_ERROR, "manual: _kgspBootGspRm(): Asserting pbRetry\n");
     NV_ASSERT_OR_RETURN(pbRetry != NULL, NV_ERR_INVALID_ARGUMENT);
     *pbRetry = NV_FALSE;
-
+	NV_PRINTF(LEVEL_ERROR, "manual: _kgspBootGspRm(): Asserted pbRetry\n");
     // Fail early if WPR2 is up
     if (kgspIsWpr2Up_HAL(pGpu, pKernelGsp) &&
         (!pGpu->getProperty(pGpu, PDB_PROP_GPU_PREINITIALIZED_WPR_REGION)))
@@ -3703,9 +3706,13 @@ kgspInitRm_IMPL
     OBJTMR    *pTmr = GPU_GET_TIMER(pGpu);
     GPU_MASK   gpusLockedMask = 0;
     KernelFsp *pKernelFsp = GPU_GET_KERNEL_FSP(pGpu);
+	NV_PRINTF(LEVEL_ERROR, "manual: kgspInitRm_IMPL(): initializing Resource manager \n");
+
+	NV_PRINTF(LEVEL_ERROR, "manual: kgspInitRm_IMPL(): checking gsp_client\n");
 
     if (!IS_GSP_CLIENT(pGpu))
         return NV_OK;
+	NV_PRINTF(LEVEL_ERROR, "manual: kgspInitRm_IMPL(): GSP_CLIENT_NOT OK\n");
 
     if ((pGspFw == NULL) || (pGspFw->pBuf == NULL) || (pGspFw->size == 0))
     {
@@ -3740,6 +3747,8 @@ kgspInitRm_IMPL
 
         if (status == NV_OK)
         {
+			NV_PRINTF(LEVEL_ERROR, "manual: kgspInitRm_IMPL(): bios image status ok\n");
+
             NvU64 vbiosVersionCombined = 0;
 
             // Got a VBIOS image, now parse it for FWSEC.
@@ -3774,6 +3783,7 @@ kgspInitRm_IMPL
         }
 
     }
+	NV_PRINTF(LEVEL_ERROR, "manual: kgspInitRm_IMPL(): extracting vBios image done\n");
 
     /*
      * We use a set of Booter ucodes to boot GSP-RM as well as manage its lifecycle.
@@ -3815,6 +3825,7 @@ kgspInitRm_IMPL
             }
         }
     }
+	NV_PRINTF(LEVEL_ERROR, "manual: kgspInitRm_IMPL(): preparing binary boot image\n");
 
     // Prepare boot binary image.
     status = kgspPrepareBootBinaryImage(pGpu, pKernelGsp);
@@ -3844,10 +3855,12 @@ kgspInitRm_IMPL
 
     NV_CHECK_OK_OR_GOTO(status, LEVEL_ERROR, nvlogRegisterFlushCb(kgspNvlogFlushCb, pKernelGsp), done);
 
+
     // Reset thread state timeout and wait for GFW_BOOT OK status
     threadStateResetTimeout(pGpu);
     NV_CHECK_OK_OR_GOTO(status, LEVEL_ERROR, kgspWaitForGfwBootOk_HAL(pGpu, pKernelGsp), done);
 
+	NV_PRINTF(LEVEL_ERROR, "manual: kgspInitRm_IMPL(): goto statements are passed off \n");
     //
     // Set the GPU time to the wall-clock time after GFW boot is complete
     // (to avoid PLM collisions) but before loading GSP-RM ucode (which
@@ -3947,11 +3960,14 @@ kgspInitRm_IMPL
 
     if (status != NV_OK)
     {
+		NV_PRINTF(LEVEL_ERROR, "manual: kgspInitRm_IMPL(): kgspBootGspRm() failed \n");
+
         if (status == NV_ERR_INSUFFICIENT_POWER)
         {
             OBJSYS *pSys = SYS_GET_INSTANCE();
             OBJGPUMGR *pGpuMgr = SYS_GET_GPUMGR(pSys);
 
+			NV_PRINTF(LEVEL_ERROR, "manual: kgspInitRm_IMPL(): insufficent power\n");
             pGpuMgr->powerDisconnectedGpuBus[pGpuMgr->powerDisconnectedGpuCount++] = gpuGetBus(pGpu);
         }
 
@@ -3990,14 +4006,20 @@ kgspInitRm_IMPL
 
     // Set FW WPR layout offset as per data from GSP.
     _kgspSetFwWprLayoutOffset(pGpu);
+	NV_PRINTF(LEVEL_ERROR, "manual: kgspInitRm_IMPL(): staring to Poll\n");
 
     NV_CHECK_OK_OR_GOTO(status, LEVEL_ERROR, kgspStartLogPolling(pGpu, pKernelGsp), done);
 
+	NV_PRINTF(LEVEL_ERROR, "manual: kgspInitRm_IMPL(): function ending\n");
+
 done:
+
     pKernelGsp->bInInit = NV_FALSE;
 
     if (status != NV_OK)
     {
+
+		NV_PRINTF(LEVEL_ERROR, "manual: kgspInitRm_IMPL(): status != NV_OK\n");
         KernelPmu *pKernelPmu = GPU_GET_KERNEL_PMU(pGpu);
 
         // Force sync GSP logs
