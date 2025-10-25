@@ -1203,11 +1203,11 @@ RK3588_setupFunc
 
 		//or using base address
 	
-//  RmPhysAddr baseAddress = (RmPhysAddr)(osPciReadDword(pCl->FHBAddr.handle,
-  //                                            RK3588_CONFIG_SPACE_BASE_ADDRESS));
+RmPhysAddr baseAddress = (RmPhysAddr)(osPciReadDword(pCl->FHBAddr.handle,
+                                            RK3588_CONFIG_SPACE_BASE_ADDRESS));
 
-	//if (clInsertPcieConfigSpaceBase(pCl, baseAddress, 0, 0, (NvU8)(PCI_MAX_BUSES - 1)) == NV_OK)
-	//	pCl->setProperty(pCl, PDB_PROP_CL_PCIE_CONFIG_ACCESSIBLE, NV_TRUE);
+	if (clInsertPcieConfigSpaceBase(pCl, baseAddress, 0, 0, (NvU8)(PCI_MAX_BUSES - 1)) == NV_OK)
+        pCl->setProperty(pCl, PDB_PROP_CL_PCIE_CONFIG_ACCESSIBLE, NV_TRUE);
 
 	pCl->setProperty(pCl, PDB_PROP_CL_IS_CHIPSET_IO_COHERENT, NV_FALSE);
 	pCl->setProperty(pCl, PDB_PROP_CL_PCIE_NON_COHERENT_USE_TC0_ONLY, NV_TRUE);

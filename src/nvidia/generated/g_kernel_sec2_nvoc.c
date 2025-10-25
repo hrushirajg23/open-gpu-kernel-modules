@@ -654,11 +654,9 @@ static void __nvoc_init_funcTable_KernelSec2_1(KernelSec2 *pThis, GpuHalspecOwne
         }
     }
 
-	NV_PRINTF(LEVEL_ERROR, "manual : __ksec2GetBinArchiveSecurescrubUcode__ initialization\n");
     // ksec2GetBinArchiveSecurescrubUcode -- halified (3 hals) body
     if (( ((rmVariantHal_HalVarIdx >> 5) == 0UL) && ((1UL << (rmVariantHal_HalVarIdx & 0x1f)) & 0x00000001UL) )) /* RmVariantHal: VF */ 
     {
-		NV_PRINTF(LEVEL_ERROR, "manual : __ksec2GetBinArchiveSecurescrubUcode__ points &ksec2GetBinArchiveSecurescrubUcode_80f438 \n");
         pThis->__ksec2GetBinArchiveSecurescrubUcode__ = &ksec2GetBinArchiveSecurescrubUcode_80f438;
     }
     else
@@ -670,7 +668,6 @@ static void __nvoc_init_funcTable_KernelSec2_1(KernelSec2 *pThis, GpuHalspecOwne
         else
         {
             pThis->__ksec2GetBinArchiveSecurescrubUcode__ = &ksec2GetBinArchiveSecurescrubUcode_80f438;
-		NV_PRINTF(LEVEL_ERROR, "manual : __ksec2GetBinArchiveSecurescrubUcode__ else \n");
         }
     }
 

@@ -4898,7 +4898,7 @@ void NV_API_CALL rm_set_rm_firmware_requested(
 )
 {
     nv->request_firmware = NV_TRUE;
-    nv->allow_fallback_to_monolithic_rm = NV_FALSE;
+    nv->allow_fallback_to_monolithic_rm = NV_TRUE;
     if (rm_get_is_gsp_capable_vgpu(sp, nv))
     {
         nv->request_firmware = NV_FALSE;

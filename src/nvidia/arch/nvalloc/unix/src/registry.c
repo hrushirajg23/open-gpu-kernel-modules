@@ -156,6 +156,7 @@ static nv_reg_entry_t* regFindRegistryEntry(
         {
             DBG_REG_PRINTF("  Testing against %s\n",
                     tmp->regParmStr);
+
             if ((stringCaseCompare(tmp->regParmStr, regParmStr) == 0) &&
                 (type == tmp->type))
             {
