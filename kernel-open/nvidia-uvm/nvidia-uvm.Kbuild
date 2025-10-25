@@ -56,6 +56,7 @@ NV_CONFTEST_FUNCTION_COMPILE_TESTS += iommu_is_dma_domain
 NV_CONFTEST_FUNCTION_COMPILE_TESTS += for_each_sgtable_dma_page
 NV_CONFTEST_FUNCTION_COMPILE_TESTS += folio_test_swapcache
 NV_CONFTEST_FUNCTION_COMPILE_TESTS += page_pgmap
+NV_CONFTEST_FUNCTION_COMPILE_TESTS += __mmu_notifier_register
 
 NV_CONFTEST_TYPE_COMPILE_TESTS += mmu_notifier_ops_arch_invalidate_secondary_tlbs
 NV_CONFTEST_TYPE_COMPILE_TESTS += migrate_vma_added_flags

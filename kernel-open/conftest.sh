@@ -2580,6 +2580,16 @@ compile_test() {
             compile_check_conftest "$CODE" "NV_MMU_NOTIFIER_OPS_HAS_ARCH_INVALIDATE_SECONDARY_TLBS" "" "types"
         ;;
 
+        __mmu_notifier_register)
+            CODE="
+            #include <linux/mmu_notifier.h>
+            void conftest_mmu_notifier_register(void) {
+                __mmu_notifier_register();
+            }"
+            compile_check_conftest "$CODE" "NV_MMU_NOTIFIER_REGISTER" "" "functions"
+            ;;
+
+
         drm_format_num_planes)
             #
             # Determine if drm_format_num_planes() function is present.

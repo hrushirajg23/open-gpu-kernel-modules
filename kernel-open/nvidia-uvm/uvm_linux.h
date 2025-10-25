@@ -36,6 +36,12 @@
 
 #include "nv-time.h"
 
+#if defined(NV_MMU_NOTIFIER_REGISTER) && defined(NV_MMU_NOTIFIER_OPS_HAS_INVALIDATE_RANGE)
+     #define UVM_CAN_USE_MMU_NOTIFIERS() 1
+ #else
+     #define UVM_CAN_USE_MMU_NOTIFIERS() 0
+ #endif
+
 #define NV_BUILD_MODULE_INSTANCES 0
 #include "nv-linux.h"
 
@@ -101,7 +107,6 @@
         #define UVM_HMM_RANGE_FAULT_SUPPORTED() 0
     #endif
 
-    #define UVM_CAN_USE_MMU_NOTIFIERS() 1
 
 //
 // printk.h already defined pr_fmt, so we have to redefine it so the pr_*
