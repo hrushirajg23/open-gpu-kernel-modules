@@ -298,7 +298,6 @@ CSINFO chipsetInfo[] =
     {PCI_VENDOR_ID_AMPERE,      0xE20D, CS_AMPERE_AMPEREONE192, "Ampere AmpereOne-192", Ampere_AmpereOne_setupFunc},
     {PCI_VENDOR_ID_AMPERE,      0xE20E, CS_AMPERE_AMPEREONE192, "Ampere AmpereOne-192", Ampere_AmpereOne_setupFunc},
     {PCI_VENDOR_ID_AMPERE,      0xE20F, CS_AMPERE_AMPEREONE192, "Ampere AmpereOne-192", Ampere_AmpereOne_setupFunc},
-
 	{PCI_VENDOR_ID_ROCKCHIP,      0x3588, CS_ROCKCHIP_RK3588, "Rockchip RK3588", RK3588_setupFunc},
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
