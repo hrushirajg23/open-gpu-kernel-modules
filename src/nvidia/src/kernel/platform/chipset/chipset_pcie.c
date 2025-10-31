@@ -323,6 +323,8 @@ objClInitPcieChipset(OBJGPU *pGpu, OBJCL *pCl)
                     break;
                 }
             }
+            portDbgPrintf("pcl->FHBBusInfo.vendorID = %d\n", pCl->FHBBusInfo.vendorID );
+            portDbgPrintf("pcl->FHBBusInfo.deviceID = %d\n", pCl->FHBBusInfo.deviceID);
 
             if (armChipsetAllowListInfo[i].vendorID == 0)
             {
