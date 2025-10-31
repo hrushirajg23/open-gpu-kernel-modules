@@ -1202,7 +1202,8 @@ RK3588_setupFunc
 		*/
 
 		//or using base address
-	
+ // minimal bring-up stub
+    NV_PRINTF(LEVEL_INFO, "RK3588 setup called for PCIe dGPU support\n");
 RmPhysAddr baseAddress = (RmPhysAddr)(osPciReadDword(pCl->FHBAddr.handle,
                                             RK3588_CONFIG_SPACE_BASE_ADDRESS));
 
@@ -1211,6 +1212,7 @@ RmPhysAddr baseAddress = (RmPhysAddr)(osPciReadDword(pCl->FHBAddr.handle,
 
 	pCl->setProperty(pCl, PDB_PROP_CL_IS_CHIPSET_IO_COHERENT, NV_FALSE);
 	pCl->setProperty(pCl, PDB_PROP_CL_PCIE_NON_COHERENT_USE_TC0_ONLY, NV_TRUE);
+    return NV_OK;	
 }
 
 // Marvell ThunderX2 Setup Function

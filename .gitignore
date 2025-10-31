@@ -5,3 +5,5 @@
 _out/
 *~
 *.swp
+config.bat
+node_modules

@@ -293,6 +293,7 @@ objClInitPcieChipset(OBJGPU *pGpu, OBJCL *pCl)
         // Find the first host bridge
         if (clFindFHBAndGetChipsetInfoIndex(pCl, &chipsetInfoIndex) == NV_OK)
         {
+            NV_PRINTF(LEVEL_ERROR, "ChipsetInfoIndex is %d\n", chipsetInfoIndex);
             pCl->Chipset = chipsetInfo[chipsetInfoIndex].chipset;
             // If the chipset info is not found, chipsetInfo[chipsetInfoIndex].setupFunc = NULL
             if ((chipsetInfo[chipsetInfoIndex].setupFunc != NULL) &&
@@ -315,6 +316,7 @@ objClInitPcieChipset(OBJGPU *pGpu, OBJCL *pCl)
 
         if (NVCPU_IS_FAMILY_ARM)
         {
+            NV_PRINTF(LEVEL_WARNING, "NVRM: ARM FAMILY recognized \n");
             for (i=0; armChipsetAllowListInfo[i].vendorID; i++)
             {
                 if (pCl->FHBBusInfo.vendorID == armChipsetAllowListInfo[i].vendorID &&
@@ -323,8 +325,8 @@ objClInitPcieChipset(OBJGPU *pGpu, OBJCL *pCl)
                     break;
                 }
             }
-            portDbgPrintf("pcl->FHBBusInfo.vendorID = %d\n", pCl->FHBBusInfo.vendorID );
-            portDbgPrintf("pcl->FHBBusInfo.deviceID = %d\n", pCl->FHBBusInfo.deviceID);
+            NV_PRINTF(LEVEL_ERROR, "pcl->FHBBusInfo.vendorID = %x\n", pCl->FHBBusInfo.vendorID );
+            NV_PRINTF(LEVEL_ERROR, "pcl->FHBBusInfo.deviceID = %x\n", pCl->FHBBusInfo.deviceID);
 
             if (armChipsetAllowListInfo[i].vendorID == 0)
             {
